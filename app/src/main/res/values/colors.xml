@@ -1,0 +1,8 @@
+<resources>
+    <color name="ink">#171717</color>
+    <color name="paper">#F2F2F7</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="accent">#34C759</color>
+    <color name="expense">#FF3B30</color>
+    <color name="income">#16A34A</color>
+</resources>
