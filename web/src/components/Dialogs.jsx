@@ -8,6 +8,7 @@ import {
   Copy,
   ExternalLink,
   FileSpreadsheet,
+  Landmark,
   LogIn,
   LogOut,
   Save,
@@ -18,17 +19,17 @@ import { getSupabaseConfig, isSupabaseConfigured, saveSupabaseConfig } from "../
 import { SUPABASE_DASHBOARD_URL, SUPABASE_SQL } from "../lib/supabaseSetup";
 import { today } from "../lib/finance";
 
-export function MovementDialog({ data, onClose, onSave }) {
+export function MovementDialog({ data, initial = null, mode = "new", onClose, onSave }) {
   const [form, setForm] = useState({
-    date: today(),
-    time: new Date().toTimeString().slice(0, 5),
-    kind: "expense",
-    account: data.accounts[0]?.name || "",
-    toAccount: data.accounts[1]?.name || "",
-    category: data.categories.find((category) => category.kind === "expense")?.name || "",
-    amount: "",
-    note: "",
-    description: "",
+    date: initial?.date || today(),
+    time: initial?.time || new Date().toTimeString().slice(0, 5),
+    kind: initial?.kind || "expense",
+    account: initial?.account || data.accounts.find((account) => !account.hidden)?.name || "",
+    toAccount: initial?.toAccount || data.accounts.find((account) => !account.hidden && account.name !== initial?.account)?.name || "",
+    category: initial?.category || data.categories.find((category) => category.kind === "expense")?.name || "",
+    amount: initial?.amount ?? "",
+    note: initial?.note || "",
+    description: initial?.description || "",
   });
   const categories = data.categories.filter((category) => category.kind === form.kind);
 
@@ -49,7 +50,7 @@ export function MovementDialog({ data, onClose, onSave }) {
     if (form.kind === "transfer" && form.account === form.toAccount) return;
     onSave({
       ...form,
-      id: crypto.randomUUID(),
+      id: mode === "edit" ? initial.id : crypto.randomUUID(),
       amount: Number(form.amount),
       category: form.kind === "transfer" ? "Transferencia" : form.category,
       toAccount: form.kind === "transfer" ? form.toAccount : "",
@@ -57,7 +58,7 @@ export function MovementDialog({ data, onClose, onSave }) {
   }
 
   return (
-    <Modal title="Nuevo movimiento" onClose={onClose}>
+    <Modal title={mode === "edit" ? "Editar movimiento" : mode === "copy" ? "Copiar movimiento" : "Nuevo movimiento"} onClose={onClose}>
       <form className="movement-form" onSubmit={submit}>
         <label>Tipo
           <select name="kind" value={form.kind} onChange={change}>
@@ -91,8 +92,83 @@ export function MovementDialog({ data, onClose, onSave }) {
         )}
         <label>Nota<input name="note" value={form.note} onChange={change} /></label>
         <label>Descripcion<input name="description" value={form.description} onChange={change} /></label>
-        <button className="dialog-primary" type="submit">Guardar</button>
+        <button className="dialog-primary" type="submit">
+          {mode === "edit" ? "Guardar cambios" : mode === "copy" ? "Crear copia" : "Guardar"}
+        </button>
       </form>
+    </Modal>
+  );
+}
+
+export function AccountDialog({ account = null, currencyCode, onClose, onSave }) {
+  const [form, setForm] = useState({
+    name: account?.name || "",
+    type: account?.type === "Efectivo" ? "Efectivo" : "Cuentas de Banco",
+    balance: account?.balance ?? "",
+    description: account?.description || "",
+    includeTotal: account?.includeTotal !== false,
+    hidden: account?.hidden || false,
+  });
+
+  function submit(event) {
+    event.preventDefault();
+    const name = form.name.trim();
+    if (!name) return;
+    onSave({
+      ...form,
+      name,
+      balance: Number(form.balance) || 0,
+      currency: currencyCode,
+      originalName: account?.name || "",
+    });
+  }
+
+  return (
+    <Modal title={account ? "Editar cuenta" : "Nueva cuenta"} onClose={onClose}>
+      <form className="movement-form" onSubmit={submit}>
+        <label>Nombre<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} autoFocus /></label>
+        <label>Tipo
+          <select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>
+            <option>Efectivo</option>
+            <option>Cuentas de Banco</option>
+          </select>
+        </label>
+        <label>Saldo inicial ({currencyCode})<input type="number" step="0.01" value={form.balance} onChange={(event) => setForm({ ...form, balance: event.target.value })} /></label>
+        <label>Descripcion<input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
+        <label className="check-field"><input type="checkbox" checked={form.includeTotal} onChange={(event) => setForm({ ...form, includeTotal: event.target.checked })} /> Incluir en el total</label>
+        <button className="dialog-primary" type="submit"><Save size={18} /> Guardar cuenta</button>
+      </form>
+    </Modal>
+  );
+}
+
+const CURRENCIES = [
+  ["PEN", "Peru", "S/"],
+  ["USD", "Estados Unidos", "$"],
+  ["EUR", "Union Europea", "€"],
+  ["MXN", "Mexico", "MX$"],
+  ["COP", "Colombia", "COL$"],
+  ["CLP", "Chile", "CLP$"],
+  ["ARS", "Argentina", "AR$"],
+  ["BRL", "Brasil", "R$"],
+];
+
+export function CurrencyDialog({ value, onClose, onSave }) {
+  const [currencyCode, setCurrencyCode] = useState(value || "PEN");
+  return (
+    <Modal title="Moneda y pais" onClose={onClose}>
+      <div className="currency-form">
+        <p>La moneda elegida se aplicara a los totales, cuentas, movimientos y reportes.</p>
+        <div className="currency-options">
+          {CURRENCIES.map(([code, country, symbol]) => (
+            <button className={currencyCode === code ? "active" : ""} onClick={() => setCurrencyCode(code)} key={code}>
+              <Landmark size={19} />
+              <span><strong>{country}</strong><small>{code} · {symbol}</small></span>
+            </button>
+          ))}
+        </div>
+        <button className="dialog-primary" onClick={() => onSave(currencyCode)}><Save size={18} /> Aplicar moneda</button>
+      </div>
     </Modal>
   );
 }

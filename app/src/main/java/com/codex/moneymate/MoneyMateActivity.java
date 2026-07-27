@@ -66,7 +66,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-public final class MainActivity extends Activity {
+public class MoneyMateActivity extends Activity {
     private static final int IMPORT_BACKUP = 4001;
     private static final int EXPORT_BACKUP = 4002;
     private static final int EXPORT_REPORT = 4003;
@@ -80,6 +80,7 @@ public final class MainActivity extends Activity {
     private String statsDetailCategory;
     private String statsScope = "mensual";
     private String statsAnchorDate;
+    private String transactionAnchorDate;
     private String searchQuery = "";
     private String searchAccount = "";
     private String searchFrom = "";
@@ -132,6 +133,7 @@ public final class MainActivity extends Activity {
         if (getIntent() != null && getIntent().getData() != null) importBackup(getIntent().getData());
         period = db.latestMonth();
         statsAnchorDate = db.latestDate();
+        transactionAnchorDate = db.latestDate();
         draw();
     }
 
@@ -201,7 +203,7 @@ public final class MainActivity extends Activity {
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setPadding(dp(4), dp(4), dp(2), dp(4));
-        top.setBackground(rounded(topSurface, 22, 0, strokeColor));
+        top.setBackground(rounded(topSurface, 8, 1, strokeColor));
         top.setElevation(0);
         top.setLayoutParams(margins(-1, dp(62), 0, 10));
 
@@ -211,12 +213,16 @@ public final class MainActivity extends Activity {
         logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         top.addView(logo, new LinearLayout.LayoutParams(dp(42), dp(42)));
 
-        String subtitle = titleForScreen() + " · " + ("stats".equals(screen) ? statsRange().label : monthLabel(period));
+        String subtitle;
+        if ("stats".equals(screen)) subtitle = titleForScreen() + " · " + statsRange().label;
+        else if ("trans".equals(screen)) subtitle = titleForScreen() + " · " + transactionRangeLabel();
+        else subtitle = titleForScreen() + " · " + monthLabel(period);
         TextView title = text("", 18, true, textColor);
         title.setText(appHeaderText("MoneyMate Modern", subtitle));
         title.setGravity(Gravity.CENTER);
         title.setOnClickListener(v -> {
             if ("stats".equals(screen)) statsDateDialog();
+            else if ("trans".equals(screen)) transactionDateDialog();
             else monthDialog();
         });
         top.addView(title, new LinearLayout.LayoutParams(0, dp(52), 1));
@@ -250,37 +256,37 @@ public final class MainActivity extends Activity {
     private void applyPalette() {
         darkMode = prefs != null && prefs.getBoolean("dark_mode", false);
         if (darkMode) {
-            bg = Color.rgb(18, 18, 18);
-            surface = Color.rgb(28, 28, 30);
-            surface2 = Color.rgb(36, 37, 39);
-            topSurface = Color.argb(196, 28, 28, 30);
-            textColor = Color.rgb(242, 242, 247);
-            muted = Color.rgb(166, 168, 173);
-            accent = Color.rgb(52, 199, 89);
-            actionColor = Color.rgb(79, 86, 96);
-            actionSoft = Color.rgb(42, 44, 48);
-            incomeColor = Color.rgb(48, 209, 88);
-            expenseColor = Color.rgb(255, 69, 58);
-            transferColor = Color.rgb(90, 155, 255);
-            transferSoft = Color.rgb(25, 46, 72);
-            strokeColor = Color.rgb(48, 49, 52);
+            bg = Color.rgb(21, 23, 22);
+            surface = Color.rgb(32, 35, 34);
+            surface2 = Color.rgb(39, 42, 41);
+            topSurface = Color.argb(224, 32, 35, 34);
+            textColor = Color.rgb(241, 244, 242);
+            muted = Color.rgb(165, 172, 168);
+            accent = Color.rgb(67, 201, 139);
+            actionColor = Color.rgb(67, 201, 139);
+            actionSoft = Color.rgb(32, 61, 48);
+            incomeColor = Color.rgb(67, 201, 139);
+            expenseColor = Color.rgb(255, 107, 100);
+            transferColor = Color.rgb(105, 169, 255);
+            transferSoft = Color.rgb(32, 54, 79);
+            strokeColor = Color.rgb(52, 57, 55);
         } else {
-            bg = Color.rgb(242, 242, 247);
+            bg = Color.rgb(244, 247, 245);
             surface = Color.WHITE;
-            surface2 = Color.rgb(248, 249, 251);
-            topSurface = Color.argb(214, 255, 255, 255);
-            textColor = Color.rgb(23, 33, 43);
-            muted = Color.rgb(83, 100, 113);
-            accent = Color.rgb(52, 199, 89);
-            actionColor = Color.rgb(48, 57, 70);
-            actionSoft = Color.rgb(230, 234, 239);
-            incomeColor = Color.rgb(22, 163, 74);
-            expenseColor = Color.rgb(255, 59, 48);
-            transferColor = Color.rgb(29, 108, 224);
-            transferSoft = Color.rgb(229, 241, 255);
-            strokeColor = Color.rgb(226, 232, 228);
+            surface2 = Color.rgb(248, 250, 249);
+            topSurface = Color.argb(232, 255, 255, 255);
+            textColor = Color.rgb(24, 34, 46);
+            muted = Color.rgb(102, 112, 133);
+            accent = Color.rgb(19, 138, 97);
+            actionColor = Color.rgb(19, 138, 97);
+            actionSoft = Color.rgb(229, 244, 237);
+            incomeColor = Color.rgb(19, 138, 97);
+            expenseColor = Color.rgb(228, 61, 55);
+            transferColor = Color.rgb(29, 111, 218);
+            transferSoft = Color.rgb(231, 241, 255);
+            strokeColor = Color.rgb(225, 231, 227);
         }
-        getWindow().setStatusBarColor(darkMode ? bg : Color.rgb(242, 242, 247));
+        getWindow().setStatusBarColor(bg);
         getWindow().setNavigationBarColor(bg);
     }
 
@@ -354,8 +360,13 @@ public final class MainActivity extends Activity {
     }
 
     private void renderTransactions() {
-        String start = "total".equals(transactionMode) ? null : period + "-01";
-        String end = "total".equals(transactionMode) ? null : period + "-31";
+        TransactionRange selectedRange = TransactionScopes.range(
+                transactionMode,
+                transactionAnchorDate,
+                db.latestDate()
+        );
+        String start = selectedRange.start;
+        String end = selectedRange.end;
         if ("buscar".equals(transactionMode)) {
             start = searchFrom.isEmpty() ? null : searchFrom;
             end = searchTo.isEmpty() ? null : searchTo;
@@ -378,17 +389,26 @@ public final class MainActivity extends Activity {
         content.addView(dataStatusStrip(s));
         content.addView(topAction("Nuevo movimiento", v -> movementDialog(null)));
 
+        Button search = searchModeButton();
+        search.setText("Buscar cuentas, notas, fechas o importes");
+        content.addView(search, margins(-1, dp(40), 0, 7));
+
         LinearLayout modes = new LinearLayout(this);
         modes.setOrientation(LinearLayout.HORIZONTAL);
-        modes.addView(modeButton("Diario", "diario"), pillParams(false));
+        modes.addView(modeButton("Anual", "anual"), pillParams(false));
         modes.addView(modeButton("Mensual", "mensual"), pillParams(false));
-        modes.addView(modeButton("Total", "total"), pillParams(false));
-        modes.addView(searchModeButton(), pillParams(true));
+        modes.addView(modeButton("Semanal", "semanal"), pillParams(false));
+        modes.addView(modeButton("Diario", "diario"), pillParams(false));
+        modes.addView(modeButton("Total", "todo"), pillParams(true));
         content.addView(modes);
 
         if ("buscar".equals(transactionMode)) content.addView(activeSearchStrip(rows.size()));
-        if ("mensual".equals(transactionMode)) renderMonthly(rows);
-        else renderTransactionRows(rows, false);
+        renderTransactionRows(rows, false);
+    }
+
+    private String transactionRangeLabel() {
+        if ("buscar".equals(transactionMode)) return "Busqueda";
+        return TransactionScopes.range(transactionMode, transactionAnchorDate, db.latestDate()).label;
     }
 
     private MoneyDb.Summary summaryForRows(List<MoneyDb.Row> rows) {
@@ -452,7 +472,7 @@ public final class MainActivity extends Activity {
         LinearLayout strip = new LinearLayout(this);
         strip.setOrientation(LinearLayout.HORIZONTAL);
         strip.setGravity(Gravity.CENTER_VERTICAL);
-        strip.setBackground(rounded(softAccent(), 12, 0, strokeColor));
+        strip.setBackground(rounded(softAccent(), 6, 1, strokeColor));
         strip.setPadding(dp(10), dp(8), dp(10), dp(8));
         strip.setLayoutParams(margins(-1, -2, 0, 8));
         String source = prefs.getString("last_import_name", "datos locales");
@@ -905,7 +925,7 @@ public final class MainActivity extends Activity {
     private TextView topAction(String label, View.OnClickListener listener) {
         TextView v = text(label, 14, true, Color.WHITE);
         v.setGravity(Gravity.CENTER);
-        v.setBackground(rounded(actionColor, 16, 0, actionColor));
+        v.setBackground(rounded(actionColor, 6, 0, actionColor));
         v.setPadding(dp(12), 0, dp(12), 0);
         v.setLayoutParams(margins(-1, dp(44), 0, 8));
         v.setOnClickListener(listener);
@@ -917,7 +937,7 @@ public final class MainActivity extends Activity {
         b.setTextSize(13);
         b.setTypeface(Typeface.DEFAULT_BOLD);
         b.setTextColor(Color.WHITE);
-        b.setBackground(rounded(actionColor, 16, 0, actionColor));
+        b.setBackground(rounded(actionColor, 6, 0, actionColor));
         return b;
     }
 
@@ -1177,6 +1197,7 @@ public final class MainActivity extends Activity {
             }
         }
         period = d.length() >= 7 ? d.substring(0, 7) : period;
+        transactionAnchorDate = d;
         markLocalDataChanged();
         return true;
     }
@@ -1456,7 +1477,7 @@ public final class MainActivity extends Activity {
         form.addView(url);
         form.addView(key);
         Button guide = iconSmallButton("Cómo crear y configurar Supabase", R.drawable.ic_action_help, null);
-        form.addView(guide, new LinearLayout.LayoutParams(-1, dp(48)));
+        form.addView(guide, new LinearLayout.LayoutParams(-1, dp(56)));
         form.addView(text("La clave debe ser la publica (publishable o anon). Nunca uses service_role.", 12, false, muted));
 
         AlertDialog dialog = new AlertDialog.Builder(this)
@@ -1536,9 +1557,9 @@ public final class MainActivity extends Activity {
         Button accountAction = iconActionWide("Iniciar sesión", R.drawable.ic_menu_sync, null);
         form.addView(accountAction);
         Button guide = iconSmallButton("Cómo crear y configurar Supabase", R.drawable.ic_action_help, null);
-        form.addView(guide, new LinearLayout.LayoutParams(-1, dp(44)));
+        form.addView(guide, new LinearLayout.LayoutParams(-1, dp(56)));
         Button changeConnection = iconSmallButton("Cambiar conexión de Supabase", R.drawable.ic_menu_settings, null);
-        form.addView(changeConnection, new LinearLayout.LayoutParams(-1, dp(44)));
+        form.addView(changeConnection, new LinearLayout.LayoutParams(-1, dp(52)));
 
         Runnable refreshMode = () -> {
             loginTab.setTextColor(createMode[0] ? muted : Color.WHITE);
@@ -1639,17 +1660,17 @@ public final class MainActivity extends Activity {
         form.addView(iconSmallButton("Manual y script SQL", R.drawable.ic_action_help, v -> {
             holder[0].dismiss();
             supabaseHelpDialog();
-        }), new LinearLayout.LayoutParams(-1, dp(44)));
+        }), new LinearLayout.LayoutParams(-1, dp(52)));
         form.addView(iconSmallButton("Cambiar conexión de Supabase", R.drawable.ic_menu_settings, v -> {
             holder[0].dismiss();
             supabaseConfigurationDialog();
-        }), new LinearLayout.LayoutParams(-1, dp(44)));
+        }), new LinearLayout.LayoutParams(-1, dp(52)));
         form.addView(iconSmallButton("Cerrar sesión en este dispositivo", R.drawable.ic_action_logout, v -> {
             holder[0].dismiss();
             clearSupabaseSession();
             toast("Sesión cerrada.");
             supabaseAccountDialog();
-        }), new LinearLayout.LayoutParams(-1, dp(44)));
+        }), new LinearLayout.LayoutParams(-1, dp(52)));
         ScrollView scroll = new ScrollView(this);
         scroll.addView(form);
         holder[0] = new AlertDialog.Builder(this)
@@ -1904,7 +1925,7 @@ public final class MainActivity extends Activity {
         body.addView(supabaseStep("1", "Crear el proyecto", "Abre Supabase, crea un proyecto llamado MoneyMate Modern, guarda la contraseña de la base de datos y elige la región más cercana."));
         body.addView(iconActionWide("Abrir Supabase", R.drawable.ic_action_open, v -> openSupabaseDashboard()));
         body.addView(supabaseStep("2", "Crear la tabla segura", "En SQL Editor pulsa New query, pega el script de configuración y selecciona Run."));
-        body.addView(iconSmallButton("Copiar script SQL", R.drawable.ic_action_copy, v -> copySupabaseSql()), new LinearLayout.LayoutParams(-1, dp(48)));
+        body.addView(iconSmallButton("Copiar script SQL", R.drawable.ic_action_copy, v -> copySupabaseSql()), new LinearLayout.LayoutParams(-1, dp(52)));
         body.addView(supabaseStep("3", "Habilitar correo y contraseña", "En Authentication > Sign In / Providers abre Email y activa el proveedor. Para una prueba puedes desactivar Confirm email."));
         body.addView(supabaseStep("4", "Copiar la conexión", "En Connect o Settings > API Keys copia Project URL y Publishable key. Nunca copies Secret key ni service_role."));
         body.addView(supabaseStep("5", "Conectar tus dispositivos", "Regresa a la conexión, guarda la URL y la clave pública. Crea la cuenta una vez e inicia sesión con la misma cuenta en Android y web."));
@@ -1941,8 +1962,15 @@ public final class MainActivity extends Activity {
         badge.setGravity(Gravity.CENTER);
         badge.setBackground(rounded(transferColor, 12, 0, transferColor));
         step.addView(badge, new LinearLayout.LayoutParams(dp(38), dp(38)));
-        TextView copy = text(title + "\n" + description, 14, true, textColor);
+
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
         copy.setPadding(dp(12), 0, 0, 0);
+        TextView titleView = text(title, 15, true, textColor);
+        TextView descriptionView = text(description, 14, false, textColor);
+        descriptionView.setPadding(0, dp(3), 0, 0);
+        copy.addView(titleView, new LinearLayout.LayoutParams(-1, -2));
+        copy.addView(descriptionView, new LinearLayout.LayoutParams(-1, -2));
         step.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
         return step;
     }
@@ -1970,6 +1998,18 @@ public final class MainActivity extends Activity {
         DatePickerDialog dialog = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
             period = String.format(Locale.US, "%04d-%02d", year, month + 1);
             draw();
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH));
+        dialog.show();
+        styleDialog(dialog);
+    }
+
+    private void transactionDateDialog() {
+        Calendar cal = calendarFrom(transactionAnchorDate == null ? db.latestDate() : transactionAnchorDate);
+        DatePickerDialog dialog = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+            transactionAnchorDate = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
+            period = transactionAnchorDate.substring(0, 7);
+            if ("buscar".equals(transactionMode)) transactionMode = "diario";
+            renderScreen();
         }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH));
         dialog.show();
         styleDialog(dialog);
@@ -2698,7 +2738,7 @@ public final class MainActivity extends Activity {
     private LinearLayout panel() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setBackground(rounded(surface, 18, 0, strokeColor));
+        box.setBackground(rounded(surface, 8, 1, strokeColor));
         box.setElevation(0);
         box.setPadding(dp(12), dp(12), dp(12), dp(12));
         box.setLayoutParams(margins(-1, -2, 0, 8));
@@ -2708,7 +2748,7 @@ public final class MainActivity extends Activity {
     private LinearLayout compactPanel() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setBackground(rounded(surface, 14, 0, strokeColor));
+        box.setBackground(rounded(surface, 8, 1, strokeColor));
         box.setPadding(dp(8), dp(10), dp(8), dp(10));
         box.setLayoutParams(margins(-1, -2, 0, 8));
         return box;
@@ -2723,6 +2763,7 @@ public final class MainActivity extends Activity {
         span.setSpan(new StyleSpan(Typeface.BOLD), label.length() + 1, full.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         v.setText(span);
         v.setGravity(Gravity.CENTER);
+        v.setPadding(dp(6), 0, dp(6), 0);
         return v;
     }
 
@@ -2753,9 +2794,9 @@ public final class MainActivity extends Activity {
             transactionMode = target;
             renderScreen();
         });
-        b.setTextColor(transactionMode.equals(target) ? Color.WHITE : muted);
-        b.setTextSize(11);
-        b.setBackground(rounded(transactionMode.equals(target) ? actionColor : surface, 14, 0, strokeColor));
+        b.setTextColor(transactionMode.equals(target) ? actionColor : muted);
+        b.setTextSize(10);
+        b.setBackground(rounded(transactionMode.equals(target) ? actionSoft : surface, 6, 1, strokeColor));
         return b;
     }
 
@@ -2763,13 +2804,13 @@ public final class MainActivity extends Activity {
         Button button = smallButton("Buscar", v -> searchDialog());
         boolean selected = "buscar".equals(transactionMode);
         Drawable icon = getResources().getDrawable(R.drawable.ic_action_search).mutate();
-        icon.setTint(selected ? Color.WHITE : muted);
+        icon.setTint(selected ? actionColor : muted);
         icon.setBounds(0, 0, dp(16), dp(16));
         button.setCompoundDrawables(icon, null, null, null);
         button.setCompoundDrawablePadding(dp(3));
-        button.setTextColor(selected ? Color.WHITE : muted);
+        button.setTextColor(selected ? actionColor : muted);
         button.setTextSize(11);
-        button.setBackground(rounded(selected ? actionColor : surface, 14, 0, strokeColor));
+        button.setBackground(rounded(selected ? actionSoft : surface, 6, 1, strokeColor));
         return button;
     }
 
@@ -2885,7 +2926,7 @@ public final class MainActivity extends Activity {
         b.setAllCaps(false);
         b.setTextSize(12);
         b.setTextColor(textColor);
-        b.setBackground(rounded(actionSoft, 18, 0, strokeColor));
+        b.setBackground(rounded(actionSoft, 6, 1, strokeColor));
         b.setOnClickListener(listener);
         b.setMinHeight(0);
         b.setMinimumHeight(0);
@@ -2893,6 +2934,8 @@ public final class MainActivity extends Activity {
         b.setMinimumWidth(0);
         b.setPadding(dp(8), 0, dp(8), 0);
         b.setIncludeFontPadding(false);
+        b.setElevation(0);
+        b.setStateListAnimator(null);
         return b;
     }
 
@@ -2920,7 +2963,7 @@ public final class MainActivity extends Activity {
         b.setTextSize(15);
         b.setTypeface(Typeface.DEFAULT_BOLD);
         b.setTextColor(Color.WHITE);
-        b.setBackground(rounded(actionColor, 20, 0, actionColor));
+        b.setBackground(rounded(actionColor, 6, 0, actionColor));
         b.setLayoutParams(margins(-1, dp(52), 0, 8));
         return b;
     }
@@ -2934,6 +2977,11 @@ public final class MainActivity extends Activity {
     private Button iconSmallButton(String label, int drawableRes, View.OnClickListener listener) {
         Button button = smallButton(label, listener);
         setButtonIcon(button, drawableRes, actionColor);
+        button.setSingleLine(false);
+        button.setMaxLines(2);
+        button.setTextSize(12);
+        button.setPadding(dp(10), dp(4), dp(10), dp(4));
+        button.setMinHeight(dp(48));
         return button;
     }
 
@@ -3001,7 +3049,14 @@ public final class MainActivity extends Activity {
         span.setSpan(new StyleSpan(Typeface.BOLD), 0, primary.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         span.setSpan(new ForegroundColorSpan(textColor), 0, primary.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         int secondaryStart = primary.length() + 1;
-        span.setSpan(new ForegroundColorSpan(muted), secondaryStart, text.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        int secondaryEnd = secondaryStart + secondary.length();
+        span.setSpan(new ForegroundColorSpan(muted), secondaryStart, secondaryEnd, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (note != null && !note.trim().isEmpty()) {
+            int noteStart = secondaryEnd + 1;
+            span.setSpan(new ForegroundColorSpan(textColor), noteStart, text.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+            span.setSpan(new StyleSpan(Typeface.BOLD), noteStart, text.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+            span.setSpan(new RelativeSizeSpan(1.06f), noteStart, text.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
         return span;
     }
 
@@ -3011,7 +3066,8 @@ public final class MainActivity extends Activity {
         v.setTextSize(sp);
         v.setTextColor(color);
         v.setLineSpacing(dp(2), 1);
-        if (bold) v.setTypeface(Typeface.DEFAULT_BOLD);
+        v.setTypeface(Typeface.create("sans-serif", bold ? Typeface.BOLD : Typeface.NORMAL));
+        v.setIncludeFontPadding(false);
         return v;
     }
 

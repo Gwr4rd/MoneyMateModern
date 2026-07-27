@@ -1,16 +1,17 @@
-# MoneyMate Modern 1.2.0
+# MoneyMate Modern 1.3.0
 
 Aplicación de finanzas personales moderna, sin anuncios y compatible con Android 10 o superior.
 
 ## Cambios de esta versión
 
-- La sesión de Supabase permanece iniciada en Android y web.
-- Android renueva el acceso con el `refresh token`; la contraseña no se guarda.
-- Los cambios locales se suben automáticamente y la nube se comprueba cada 30 segundos.
-- Se mantiene la subida y descarga manual para elegir una copia de forma explícita.
-- Nuevo manual de Supabase integrado en Android y web.
-- El script SQL seguro puede copiarse directamente desde el manual de la aplicación.
-- El flujo de configuración sigue el orden correcto: conexión, cuenta y sincronización.
+- Android adopta la estética limpia de la aplicación web, con controles mejor separados, tipografía más clara y una paleta verde consistente.
+- Transacciones incorpora los periodos Anual, Mensual, Semanal, Diario y Total.
+- Las notas se muestran siempre como una línea destacada en gastos, ingresos y transferencias.
+- El manual de Supabase evita recortes de texto y separa claramente títulos, instrucciones y acciones.
+- Comienza la migración segura a Kotlin: la actividad de entrada y la lógica de periodos ya son Kotlin; el importador de respaldos continúa en Java para conservar compatibilidad.
+- La web permite crear, editar, ocultar, mostrar y eliminar cuentas.
+- La web permite editar, copiar y eliminar transacciones.
+- La web incorpora modo claro u oscuro y selección de moneda por país.
 
 ## Funciones incluidas
 
@@ -24,7 +25,7 @@ Aplicación de finanzas personales moderna, sin anuncios y compatible con Androi
 
 ## Instalación Android
 
-1. Descarga `MoneyMateModern-release-signed-v1.2.0.apk`.
+1. Descarga `MoneyMateModern-release-signed-v1.3.0.apk`.
 2. Permite la instalación desde el navegador o gestor de archivos.
 3. Abre el APK y confirma la instalación.
 
@@ -35,4 +36,4 @@ Aplicación de finanzas personales moderna, sin anuncios y compatible con Androi
 
 La aplicación no contiene anuncios. La sincronización solo se activa cuando el usuario configura su propio proyecto de Supabase.
 
-Al actualizar desde `1.1.1` se debe iniciar sesión una última vez. Desde ese momento la sesión queda guardada y se renueva automáticamente.
+Al actualizar desde una versión anterior a `1.2.0` se debe iniciar sesión una última vez. Desde ese momento la sesión queda guardada y se renueva automáticamente.

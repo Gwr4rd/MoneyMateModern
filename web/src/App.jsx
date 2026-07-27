@@ -2,7 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { Header, MobileNav, SideNav } from "./components/AppChrome";
 import { AccountsPanel } from "./components/AccountsPanel";
-import { MovementDialog, ReportDialog, SyncDialog } from "./components/Dialogs";
+import {
+  AccountDialog,
+  CurrencyDialog,
+  MovementDialog,
+  ReportDialog,
+  SyncDialog,
+} from "./components/Dialogs";
 import { Filters } from "./components/Filters";
 import { StatusPanel } from "./components/StatusPanel";
 import { Summary } from "./components/Summary";
@@ -35,6 +41,7 @@ export default function App() {
   const [filters, setFilters] = useState({ query: "", account: "", anchor: latestDate(data.transactions) });
   const [scope, setScope] = useState("mensual");
   const [statusKind, setStatusKind] = useState("expense");
+  const [showHiddenAccounts, setShowHiddenAccounts] = useState(false);
   const [dialog, setDialog] = useState(null);
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
@@ -148,15 +155,77 @@ export default function App() {
     requestAnimationFrame(() => searchRef.current?.querySelector("input")?.focus());
   }
 
-  function saveMovement(transaction) {
+  function commitData(update, closeDialog = true) {
     localStorage.setItem(SYNC_PENDING_KEY, "1");
-    setData((current) => ({
-      ...current,
-      transactions: [transaction, ...current.transactions].sort(sortTransactions),
-    }));
+    setData(update);
     setSyncRevision((value) => value + 1);
-    setDialog(null);
+    if (closeDialog) setDialog(null);
+  }
+
+  function saveMovement(transaction) {
+    commitData((current) => {
+      const exists = current.transactions.some((item) => item.id === transaction.id);
+      const transactions = exists
+        ? current.transactions.map((item) => item.id === transaction.id ? transaction : item)
+        : [transaction, ...current.transactions];
+      return { ...current, transactions: transactions.sort(sortTransactions) };
+    });
     setFilters((current) => ({ ...current, anchor: transaction.date }));
+  }
+
+  function deleteMovement(transaction) {
+    if (!window.confirm("¿Eliminar este movimiento? Esta accion no se puede deshacer.")) return;
+    commitData((current) => ({
+      ...current,
+      transactions: current.transactions.filter((item) => item.id !== transaction.id),
+    }), false);
+  }
+
+  function saveAccount(account) {
+    const originalName = account.originalName;
+    const duplicate = data.accounts.some((item) => item.name === account.name && item.name !== originalName);
+    if (duplicate) {
+      window.alert("Ya existe una cuenta con ese nombre.");
+      return;
+    }
+    commitData((current) => {
+      const clean = { ...account };
+      delete clean.originalName;
+      const accounts = originalName
+        ? current.accounts.map((item) => item.name === originalName ? clean : item)
+        : [...current.accounts, clean];
+      const transactions = originalName && originalName !== clean.name
+        ? current.transactions.map((item) => ({
+            ...item,
+            account: item.account === originalName ? clean.name : item.account,
+            toAccount: item.toAccount === originalName ? clean.name : item.toAccount,
+          }))
+        : current.transactions;
+      return { ...current, accounts, transactions };
+    });
+  }
+
+  function toggleAccountHidden(account) {
+    commitData((current) => ({
+      ...current,
+      accounts: current.accounts.map((item) => item.name === account.name ? { ...item, hidden: !item.hidden } : item),
+    }), false);
+  }
+
+  function deleteAccount(account) {
+    if (!window.confirm(`¿Eliminar la cuenta "${account.name}"? Los movimientos historicos conservaran su nombre.`)) return;
+    commitData((current) => ({
+      ...current,
+      accounts: current.accounts.filter((item) => item.name !== account.name),
+    }), false);
+  }
+
+  function saveCurrency(currencyCode) {
+    commitData((current) => ({
+      ...current,
+      currency: currencyCode,
+      accounts: current.accounts.map((account) => ({ ...account, currency: currencyCode })),
+    }));
   }
 
   async function syncLogin(email, password) {
@@ -277,6 +346,7 @@ export default function App() {
         dark={dark}
         onNav={navigate}
         onTheme={() => setDark((value) => !value)}
+        onCurrency={() => setDialog("currency")}
         onSearch={openSearch}
         onNew={() => setDialog("movement")}
         onReport={() => setDialog("report")}
@@ -292,7 +362,7 @@ export default function App() {
               <div ref={searchRef}>
                 <Filters
                   filters={filters}
-                  accounts={data.accounts}
+                  accounts={data.accounts.filter((account) => !account.hidden)}
                   onChange={setFilters}
                   onClear={() => setFilters({ query: "", account: "", anchor: today() })}
                 />
@@ -304,7 +374,13 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              <TransactionList transactions={visibleTransactions} currencyCode={data.currency} />
+              <TransactionList
+                transactions={visibleTransactions}
+                currencyCode={data.currency}
+                onEdit={(transaction) => setDialog({ type: "movement", mode: "edit", item: transaction })}
+                onCopy={(transaction) => setDialog({ type: "movement", mode: "copy", item: transaction })}
+                onDelete={deleteMovement}
+              />
             </>
           ) : null}
           {active === "status" ? (
@@ -317,7 +393,19 @@ export default function App() {
               onKind={setStatusKind}
             />
           ) : null}
-          {active === "accounts" ? <AccountsPanel accounts={accounts} currencyCode={data.currency} full /> : null}
+          {active === "accounts" ? (
+            <AccountsPanel
+              accounts={accounts}
+              currencyCode={data.currency}
+              full
+              showHidden={showHiddenAccounts}
+              onShowHidden={() => setShowHiddenAccounts((value) => !value)}
+              onAdd={() => setDialog({ type: "account" })}
+              onEdit={(account) => setDialog({ type: "account", item: account })}
+              onToggleHidden={toggleAccountHidden}
+              onDelete={deleteAccount}
+            />
+          ) : null}
         </main>
         <aside className="context-rail">
           <StatusPanel
@@ -333,7 +421,24 @@ export default function App() {
         </aside>
       </div>
       <MobileNav active={active} onChange={navigate} />
-      {dialog === "movement" ? <MovementDialog data={data} onClose={() => setDialog(null)} onSave={saveMovement} /> : null}
+      {(dialog === "movement" || dialog?.type === "movement") ? (
+        <MovementDialog
+          data={data}
+          initial={dialog?.item || null}
+          mode={dialog?.mode || "new"}
+          onClose={() => setDialog(null)}
+          onSave={saveMovement}
+        />
+      ) : null}
+      {dialog?.type === "account" ? (
+        <AccountDialog
+          account={dialog.item || null}
+          currencyCode={data.currency}
+          onClose={() => setDialog(null)}
+          onSave={saveAccount}
+        />
+      ) : null}
+      {dialog === "currency" ? <CurrencyDialog value={data.currency} onClose={() => setDialog(null)} onSave={saveCurrency} /> : null}
       {dialog === "sync" ? (
         <SyncDialog
           onClose={() => setDialog(null)}
@@ -366,7 +471,15 @@ function normalizeSnapshot(snapshot) {
   return {
     version: 2,
     currency: snapshot.currency || "PEN",
-    accounts: Array.isArray(snapshot.accounts) ? snapshot.accounts : [],
+    accounts: (Array.isArray(snapshot.accounts) ? snapshot.accounts : []).map((account) => ({
+      name: account.name || "Cuenta",
+      currency: account.currency || snapshot.currency || "PEN",
+      type: account.type === "Efectivo" ? "Efectivo" : "Cuentas de Banco",
+      balance: Number(account.balance) || 0,
+      description: account.description || "",
+      includeTotal: account.includeTotal !== false,
+      hidden: Boolean(account.hidden),
+    })),
     categories: Array.isArray(snapshot.categories) ? snapshot.categories : [],
     transactions: (Array.isArray(snapshot.transactions) ? snapshot.transactions : [])
       .map((transaction) => ({
