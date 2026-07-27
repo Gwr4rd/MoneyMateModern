@@ -91,14 +91,14 @@ Referencias:
 ## 3. Subir el proyecto a GitHub desde la web
 
 No se necesita ningun archivo comprimido. Usa la carpeta preparada
-`MoneyMateModern-GitHub-v1.3.0` y sigue la guia
+`MoneyMateModern-GitHub-v1.3.1` y sigue la guia
 [`SUBIR_A_GITHUB_WEB.md`](SUBIR_A_GITHUB_WEB.md).
 
 Resumen:
 
 1. Crea un repositorio vacio en [GitHub](https://github.com/new).
 2. No agregues README, licencia ni `.gitignore` al crearlo, porque ya existen en el proyecto.
-3. Abre la carpeta `MoneyMateModern-GitHub-v1.3.0` en el Explorador de Windows.
+3. Abre la carpeta `MoneyMateModern-GitHub-v1.3.1` en el Explorador de Windows.
 4. Selecciona todo el contenido interior de la carpeta, no la carpeta contenedora.
 5. En GitHub abre `Add file > Upload files` y arrastra la seleccion al navegador.
 6. Espera a que termine la carga y confirma con `Commit changes`.
@@ -113,10 +113,10 @@ Referencias:
 ## 4. Crear el Release de GitHub
 
 1. Abre `Releases > Draft a new release`.
-2. Crea la etiqueta `v1.3.0`.
-3. Usa como titulo `MoneyMate Modern 1.3.0`.
+2. Crea la etiqueta `v1.3.1`.
+3. Usa como titulo `MoneyMate Modern 1.3.1`.
 4. Pega el contenido de `RELEASE_NOTES.md`.
-5. Adjunta `MoneyMateModern-release-signed-v1.3.0.apk`.
+5. Adjunta `MoneyMateModern-release-signed-v1.3.1.apk`.
 6. Publica el release.
 
 Referencia: [Administrar Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository).

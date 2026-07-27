@@ -1,6 +1,9 @@
 import { Banknote, Eye, EyeOff, Landmark, Pencil, Plus, Trash2, WalletCards } from "lucide-react";
 import { currency } from "../lib/finance";
 
+const hasZeroBalance = (account) => Math.abs(Number(account.currentBalance) || 0) < 0.005;
+const isHiddenAccount = (account) => account.hidden || hasZeroBalance(account);
+
 export function AccountsPanel({
   accounts,
   currencyCode,
@@ -12,14 +15,15 @@ export function AccountsPanel({
   onToggleHidden,
   onDelete,
 }) {
-  const hiddenCount = accounts.filter((account) => account.hidden).length;
+  const hiddenCount = accounts.filter(isHiddenAccount).length;
+  const visibleCount = accounts.length - hiddenCount;
   const visible = accounts
-    .filter((account) => full && showHidden ? true : !account.hidden)
+    .filter((account) => full && showHidden ? true : !isHiddenAccount(account))
     .sort((left, right) => {
-      if (left.hidden !== right.hidden) return left.hidden ? 1 : -1;
-      const leftEmpty = Math.abs(left.currentBalance) < 0.005;
-      const rightEmpty = Math.abs(right.currentBalance) < 0.005;
-      return leftEmpty === rightEmpty ? left.name.localeCompare(right.name, "es") : leftEmpty ? 1 : -1;
+      const leftHidden = isHiddenAccount(left);
+      const rightHidden = isHiddenAccount(right);
+      if (leftHidden !== rightHidden) return leftHidden ? 1 : -1;
+      return left.name.localeCompare(right.name, "es");
     });
   const groups = [
     ["Efectivo", visible.filter((account) => account.type === "Efectivo")],
@@ -30,7 +34,7 @@ export function AccountsPanel({
       <div className="section-heading">
         <div>
           <h2>Cuentas</h2>
-          <span>{visible.length} visibles</span>
+          <span>{visibleCount} visibles</span>
         </div>
         {full ? (
           <button className="section-primary" onClick={onAdd}><Plus size={18} /> Nueva cuenta</button>
@@ -39,14 +43,17 @@ export function AccountsPanel({
       {groups.map(([name, rows]) => rows.length ? (
         <div className="account-group" key={name}>
           <h3>{name}</h3>
-          {rows.map((account) => (
-            <article className={`account-row ${account.hidden ? "hidden" : ""}`} key={account.name}>
+          {rows.map((account) => {
+            const automatic = hasZeroBalance(account);
+            const hidden = isHiddenAccount(account);
+            return (
+            <article className={`account-row ${hidden ? "hidden" : ""}`} key={account.name}>
               <div className="account-icon">
                 {account.type === "Efectivo" ? <Banknote size={21} /> : <Landmark size={21} />}
               </div>
               <div>
                 <strong>{account.name}</strong>
-                <span>{account.type}</span>
+                <span>{automatic ? "Saldo 0.00 · Oculta automáticamente" : account.hidden ? "Oculta manualmente" : account.type}</span>
               </div>
               <strong className={account.currentBalance < 0 ? "negative" : ""}>
                 {currency(account.currentBalance, currencyCode)}
@@ -54,14 +61,19 @@ export function AccountsPanel({
               {full ? (
                 <div className="account-actions">
                   <button onClick={() => onEdit(account)} title="Editar cuenta" aria-label={`Editar ${account.name}`}><Pencil size={17} /></button>
-                  <button onClick={() => onToggleHidden(account)} title={account.hidden ? "Mostrar cuenta" : "Ocultar cuenta"} aria-label={account.hidden ? `Mostrar ${account.name}` : `Ocultar ${account.name}`}>
-                    {account.hidden ? <Eye size={18} /> : <EyeOff size={18} />}
+                  <button
+                    disabled={automatic}
+                    onClick={() => onToggleHidden(account)}
+                    title={automatic ? "Se mostrará cuando su saldo deje de ser 0.00" : account.hidden ? "Mostrar cuenta" : "Ocultar cuenta"}
+                    aria-label={automatic ? `${account.name} oculta por saldo cero` : account.hidden ? `Mostrar ${account.name}` : `Ocultar ${account.name}`}
+                  >
+                    {hidden ? <Eye size={18} /> : <EyeOff size={18} />}
                   </button>
                   <button className="danger" onClick={() => onDelete(account)} title="Eliminar cuenta" aria-label={`Eliminar ${account.name}`}><Trash2 size={17} /></button>
                 </div>
               ) : null}
             </article>
-          ))}
+          )})}
         </div>
       ) : null)}
       {full && (hiddenCount > 0 || showHidden) ? (

@@ -1,17 +1,13 @@
-# MoneyMate Modern 1.3.0
+# MoneyMate Modern 1.3.1
 
 Aplicación de finanzas personales moderna, sin anuncios y compatible con Android 10 o superior.
 
 ## Cambios de esta versión
 
-- Android adopta la estética limpia de la aplicación web, con controles mejor separados, tipografía más clara y una paleta verde consistente.
-- Transacciones incorpora los periodos Anual, Mensual, Semanal, Diario y Total.
-- Las notas se muestran siempre como una línea destacada en gastos, ingresos y transferencias.
-- El manual de Supabase evita recortes de texto y separa claramente títulos, instrucciones y acciones.
-- Comienza la migración segura a Kotlin: la actividad de entrada y la lógica de periodos ya son Kotlin; el importador de respaldos continúa en Java para conservar compatibilidad.
-- La web permite crear, editar, ocultar, mostrar y eliminar cuentas.
-- La web permite editar, copiar y eliminar transacciones.
-- La web incorpora modo claro u oscuro y selección de moneda por país.
+- Las cuentas con saldo calculado `0.00` se ocultan automáticamente en Android y web.
+- Las cuentas vacías permanecen disponibles mediante la opción `Mostrar cuentas ocultas`.
+- Una cuenta vuelve a mostrarse automáticamente cuando recibe un movimiento y deja de tener saldo cero.
+- El ocultamiento automático no modifica la cuenta ni impide editarla, eliminarla o usarla en nuevos movimientos.
 
 ## Funciones incluidas
 
@@ -25,7 +21,7 @@ Aplicación de finanzas personales moderna, sin anuncios y compatible con Androi
 
 ## Instalación Android
 
-1. Descarga `MoneyMateModern-release-signed-v1.3.0.apk`.
+1. Descarga `MoneyMateModern-release-signed-v1.3.1.apk`.
 2. Permite la instalación desde el navegador o gestor de archivos.
 3. Abre el APK y confirma la instalación.
 

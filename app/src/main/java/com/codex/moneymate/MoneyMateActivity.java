@@ -762,7 +762,7 @@ public class MoneyMateActivity extends Activity {
         List<MoneyDb.AccountTotal> visible = new ArrayList<>();
         List<MoneyDb.AccountTotal> hidden = new ArrayList<>();
         for (MoneyDb.AccountTotal a : accounts) {
-            if (a.hidden) hidden.add(a);
+            if (isHiddenAccount(a)) hidden.add(a);
             else visible.add(a);
         }
         sortAccounts(visible);
@@ -902,6 +902,14 @@ public class MoneyMateActivity extends Activity {
                 return left.name.compareToIgnoreCase(right.name);
             }
         });
+    }
+
+    private boolean hasZeroBalance(MoneyDb.AccountTotal account) {
+        return Math.abs(account.balance) < 0.005;
+    }
+
+    private boolean isHiddenAccount(MoneyDb.AccountTotal account) {
+        return account.hidden || hasZeroBalance(account);
     }
 
     private LinearLayout accountActions() {
@@ -2713,14 +2721,17 @@ public class MoneyMateActivity extends Activity {
     }
 
     private View accountRow(MoneyDb.AccountTotal a) {
+        boolean automatic = hasZeroBalance(a);
+        boolean hidden = isHiddenAccount(a);
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setBackground(rounded(a.hidden ? surface2 : surface, 10, 0, strokeColor));
+        row.setBackground(rounded(hidden ? surface2 : surface, 10, 0, strokeColor));
         row.setPadding(dp(10), dp(9), dp(10), dp(9));
         row.setLayoutParams(margins(-1, -2, 0, 1));
 
-        TextView name = text(a.name + (a.hidden ? "\nOculta" : "\n" + displayAccountType(a.type)), 13, false, a.hidden ? muted : textColor);
+        String status = automatic ? "Saldo 0.00 · Oculta automáticamente" : a.hidden ? "Oculta manualmente" : displayAccountType(a.type);
+        TextView name = text(a.name + "\n" + status, 13, false, hidden ? muted : textColor);
         name.setGravity(Gravity.CENTER_VERTICAL);
         row.addView(name, new LinearLayout.LayoutParams(0, dp(42), 1));
 
