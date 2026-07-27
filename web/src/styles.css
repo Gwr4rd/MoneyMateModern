@@ -800,6 +800,56 @@ select:focus-visible {
   font-size: 12px;
 }
 
+.movement-kind-switch {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.movement-kind-switch legend {
+  grid-column: 1 / -1;
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.movement-kind-switch button {
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--control);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.movement-kind-switch button.active {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.movement-kind-switch button.income.active {
+  border-color: var(--green);
+  background: var(--green);
+}
+
+.movement-kind-switch button.expense.active {
+  border-color: var(--red);
+  background: var(--red);
+}
+
+.movement-kind-switch button.transfer.active {
+  border-color: var(--blue);
+  background: var(--blue);
+}
+
 .movement-form input,
 .movement-form select,
 .sync-form input,
@@ -812,6 +862,49 @@ select:focus-visible {
   border-radius: 6px;
   background: var(--control);
   color: var(--text);
+}
+
+.note-autocomplete {
+  position: relative;
+  display: block;
+}
+
+.note-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  z-index: 4;
+  max-height: 210px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.note-suggestions button {
+  width: 100%;
+  min-height: 38px;
+  display: block;
+  padding: 7px 9px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-suggestions button:hover,
+.note-suggestions button:focus-visible {
+  background: var(--green-soft);
+  color: var(--green);
+  outline: 0;
 }
 
 .movement-form .check-field {

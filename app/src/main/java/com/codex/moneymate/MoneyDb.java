@@ -169,6 +169,18 @@ final class MoneyDb extends SQLiteOpenHelper {
         return rows;
     }
 
+    List<String> recentNotes() {
+        Map<String, String> unique = new LinkedHashMap<>();
+        for (Row row : rawTransactions(null, null, 0)) {
+            String note = row.note == null ? "" : row.note.trim();
+            if (note.isEmpty()) continue;
+            String key = note.toLowerCase(Locale.ROOT);
+            if (!unique.containsKey(key)) unique.put(key, note);
+            if (unique.size() >= 100) break;
+        }
+        return new ArrayList<>(unique.values());
+    }
+
     List<Row> transactionsForDisplay(String startDate, String endDate) {
         return collapseTransfers(rawTransactions(startDate, endDate, 0));
     }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   BookOpen,
@@ -20,18 +20,45 @@ import { SUPABASE_DASHBOARD_URL, SUPABASE_SQL } from "../lib/supabaseSetup";
 import { today } from "../lib/finance";
 
 export function MovementDialog({ data, initial = null, mode = "new", onClose, onSave }) {
+  const availableAccounts = data.accounts.filter((account) => !account.hidden);
+  const defaultAccount = initial?.account || availableAccounts[0]?.name || "";
+  const defaultToAccount = initial?.toAccount
+    || availableAccounts.find((account) => account.name !== defaultAccount)?.name
+    || "";
+  const [showNoteSuggestions, setShowNoteSuggestions] = useState(false);
   const [form, setForm] = useState({
     date: initial?.date || today(),
     time: initial?.time || new Date().toTimeString().slice(0, 5),
     kind: initial?.kind || "expense",
-    account: initial?.account || data.accounts.find((account) => !account.hidden)?.name || "",
-    toAccount: initial?.toAccount || data.accounts.find((account) => !account.hidden && account.name !== initial?.account)?.name || "",
+    account: defaultAccount,
+    toAccount: defaultToAccount,
     category: initial?.category || data.categories.find((category) => category.kind === "expense")?.name || "",
     amount: initial?.amount ?? "",
     note: initial?.note || "",
     description: initial?.description || "",
   });
   const categories = data.categories.filter((category) => category.kind === form.kind);
+  const previousNotes = useMemo(() => {
+    const seen = new Set();
+    return data.transactions.reduce((notes, transaction) => {
+      const note = transaction.note?.trim();
+      const key = note?.toLocaleLowerCase("es");
+      if (note && !seen.has(key)) {
+        seen.add(key);
+        notes.push(note);
+      }
+      return notes;
+    }, []);
+  }, [data.transactions]);
+  const noteQuery = form.note.trim().toLocaleLowerCase("es");
+  const noteSuggestions = noteQuery
+    ? previousNotes
+      .filter((note) => {
+        const normalized = note.toLocaleLowerCase("es");
+        return normalized.includes(noteQuery) && normalized !== noteQuery;
+      })
+      .slice(0, 6)
+    : [];
 
   function change(event) {
     const { name, value } = event.target;
@@ -57,16 +84,37 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
     });
   }
 
+  function selectKind(kind) {
+    setForm((current) => ({
+      ...current,
+      kind,
+      category: kind === "transfer"
+        ? "Transferencia"
+        : data.categories.find((category) => category.kind === kind)?.name || "",
+    }));
+  }
+
   return (
     <Modal title={mode === "edit" ? "Editar movimiento" : mode === "copy" ? "Copiar movimiento" : "Nuevo movimiento"} onClose={onClose}>
       <form className="movement-form" onSubmit={submit}>
-        <label>Tipo
-          <select name="kind" value={form.kind} onChange={change}>
-            <option value="expense">Gasto</option>
-            <option value="income">Ingreso</option>
-            <option value="transfer">Transferencia</option>
-          </select>
-        </label>
+        <fieldset className="movement-kind-switch">
+          <legend>Tipo de movimiento</legend>
+          {[
+            ["income", "Ingreso"],
+            ["expense", "Gasto"],
+            ["transfer", "Transferencia"],
+          ].map(([kind, label]) => (
+            <button
+              className={`${kind} ${form.kind === kind ? "active" : ""}`}
+              type="button"
+              aria-pressed={form.kind === kind}
+              onClick={() => selectKind(kind)}
+              key={kind}
+            >
+              {label}
+            </button>
+          ))}
+        </fieldset>
         <div className="form-pair">
           <label>Fecha<input name="date" type="date" value={form.date} onChange={change} /></label>
           <label>Hora<input name="time" type="time" value={form.time} onChange={change} /></label>
@@ -74,13 +122,13 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
         <label>Importe<input name="amount" type="number" min="0.01" step="0.01" value={form.amount} onChange={change} autoFocus /></label>
         <label>Cuenta
           <select name="account" value={form.account} onChange={change}>
-            {data.accounts.filter((account) => !account.hidden).map((account) => <option key={account.name}>{account.name}</option>)}
+            {availableAccounts.map((account) => <option key={account.name}>{account.name}</option>)}
           </select>
         </label>
         {form.kind === "transfer" ? (
           <label>Cuenta destino
             <select name="toAccount" value={form.toAccount} onChange={change}>
-              {data.accounts.filter((account) => !account.hidden).map((account) => <option key={account.name}>{account.name}</option>)}
+              {availableAccounts.map((account) => <option key={account.name}>{account.name}</option>)}
             </select>
           </label>
         ) : (
@@ -90,7 +138,40 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
             </select>
           </label>
         )}
-        <label>Nota<input name="note" value={form.note} onChange={change} /></label>
+        <label className="note-field">Nota
+          <span className="note-autocomplete">
+            <input
+              name="note"
+              value={form.note}
+              onChange={(event) => {
+                change(event);
+                setShowNoteSuggestions(true);
+              }}
+              onFocus={() => setShowNoteSuggestions(true)}
+              onBlur={() => window.setTimeout(() => setShowNoteSuggestions(false), 120)}
+              autoComplete="off"
+              placeholder="Escribe para buscar notas anteriores"
+            />
+            {showNoteSuggestions && noteSuggestions.length ? (
+              <span className="note-suggestions" role="listbox" aria-label="Notas anteriores">
+                {noteSuggestions.map((suggestion) => (
+                  <button
+                    type="button"
+                    role="option"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      setForm((current) => ({ ...current, note: suggestion }));
+                      setShowNoteSuggestions(false);
+                    }}
+                    key={suggestion}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </span>
+            ) : null}
+          </span>
+        </label>
         <label>Descripcion<input name="description" value={form.description} onChange={change} /></label>
         <button className="dialog-primary" type="submit">
           {mode === "edit" ? "Guardar cambios" : mode === "copy" ? "Crear copia" : "Guardar"}

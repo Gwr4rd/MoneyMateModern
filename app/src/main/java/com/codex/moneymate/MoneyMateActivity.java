@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
+import android.app.TimePickerDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
@@ -32,6 +33,7 @@ import android.view.Window;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -1035,7 +1037,7 @@ public class MoneyMateActivity extends Activity {
 
     private void movementDialog(MoneyDb.Row copyFrom, boolean editMode, String forcedDate) {
         LinearLayout form = new LinearLayout(this);
-        form.setPadding(dp(16), dp(8), dp(16), dp(16));
+        form.setPadding(dp(16), dp(12), dp(16), dp(20));
         form.setOrientation(LinearLayout.VERTICAL);
 
         Spinner type = spinner(labels("Gasto", "Ingreso", "Transferencia"));
@@ -1046,55 +1048,91 @@ public class MoneyMateActivity extends Activity {
         date.setOnClickListener(v -> pickDate(date));
         EditText time = input("Hora HH:MM");
         time.setText(copyFrom == null ? nowTime() : copyFrom.time);
+        time.setFocusable(false);
+        time.setInputType(0);
+        time.setOnClickListener(v -> pickTime(time));
         EditText amount = input("Importe");
         amount.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         if (copyFrom != null) amount.setText(String.format(Locale.US, "%.2f", copyFrom.amount));
         boolean includeHiddenAccounts = showHiddenAccounts || copyFrom != null;
         Spinner account = spinner(db.accounts(includeHiddenAccounts));
         Spinner toAccount = spinner(db.accounts(includeHiddenAccounts));
+        if (copyFrom == null && toAccount.getCount() > 1) toAccount.setSelection(1);
         Spinner category = spinner(db.categories("expense"));
-        EditText note = input("Nota");
+        AutoCompleteTextView note = noteInput(db.recentNotes());
         EditText description = input("Descripcion");
         if (copyFrom != null) {
             note.setText(copyFrom.note);
             description.setText(copyFrom.description);
         }
 
-        form.addView(label("Tipo"));
-        form.addView(type);
-        form.addView(date);
-        form.addView(smallButton("Elegir fecha en calendario", v -> pickDate(date)), new LinearLayout.LayoutParams(-1, dp(46)));
-        form.addView(time);
+        form.addView(label("Tipo de movimiento"));
+        LinearLayout typeSwitch = new LinearLayout(this);
+        typeSwitch.setOrientation(LinearLayout.HORIZONTAL);
+        Button incomeType = smallButton("Ingreso", null);
+        Button expenseType = smallButton("Gasto", null);
+        Button transferType = smallButton("Transferencia", null);
+        Button[] typeButtons = {expenseType, incomeType, transferType};
+        typeSwitch.addView(incomeType, movementTypeParams(false));
+        typeSwitch.addView(expenseType, movementTypeParams(false));
+        typeSwitch.addView(transferType, movementTypeParams(true));
+        form.addView(typeSwitch);
+        type.setVisibility(View.GONE);
+        form.addView(type, new LinearLayout.LayoutParams(1, 1));
+
+        form.addView(label("Fecha y hora"));
+        LinearLayout dateTime = new LinearLayout(this);
+        dateTime.setOrientation(LinearLayout.HORIZONTAL);
+        dateTime.addView(date, new LinearLayout.LayoutParams(0, dp(48), 3));
+        LinearLayout.LayoutParams timeParams = new LinearLayout.LayoutParams(0, dp(48), 2);
+        timeParams.setMargins(dp(8), 0, 0, 0);
+        dateTime.addView(time, timeParams);
+        form.addView(dateTime);
+
+        form.addView(label("Importe"));
         form.addView(amount);
-        form.addView(label("Cuenta"));
+        TextView accountLabel = label("Cuenta");
+        TextView toAccountLabel = label("Cuenta destino");
+        TextView categoryLabel = label("Categoria");
+        form.addView(accountLabel);
         form.addView(account);
-        form.addView(label("Cuenta destino"));
+        form.addView(toAccountLabel);
         form.addView(toAccount);
-        form.addView(label("Categoria"));
+        form.addView(categoryLabel);
         form.addView(category);
+        form.addView(label("Nota"));
         form.addView(note);
+        form.addView(label("Descripcion"));
         form.addView(description);
 
         type.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                boolean transfer = position == 2;
-                toAccount.setEnabled(transfer);
-                category.setEnabled(!transfer);
-                if (!transfer) {
-                    String kind = position == 1 ? "income" : "expense";
-                    category.setAdapter(stringAdapter(db.categories(kind)));
-                }
+                applyMovementType(position, typeButtons, accountLabel, toAccountLabel, toAccount, categoryLabel, category);
             }
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
             }
         });
+        incomeType.setOnClickListener(v -> {
+            type.setSelection(1);
+            applyMovementType(1, typeButtons, accountLabel, toAccountLabel, toAccount, categoryLabel, category);
+        });
+        expenseType.setOnClickListener(v -> {
+            type.setSelection(0);
+            applyMovementType(0, typeButtons, accountLabel, toAccountLabel, toAccount, categoryLabel, category);
+        });
+        transferType.setOnClickListener(v -> {
+            type.setSelection(2);
+            applyMovementType(2, typeButtons, accountLabel, toAccountLabel, toAccount, categoryLabel, category);
+        });
+        applyMovementType(0, typeButtons, accountLabel, toAccountLabel, toAccount, categoryLabel, category);
 
         if (copyFrom != null) {
             int mode = copyFrom.isTransfer() ? 2 : ("income".equals(copyFrom.kind) ? 1 : 0);
             type.setSelection(mode);
+            applyMovementType(mode, typeButtons, accountLabel, toAccountLabel, toAccount, categoryLabel, category);
             if (mode != 2) {
                 category.setAdapter(stringAdapter(db.categories(mode == 1 ? "income" : "expense")));
                 setSpinnerSelection(account, copyFrom.account);
@@ -3095,6 +3133,65 @@ public class MoneyMateActivity extends Activity {
         return e;
     }
 
+    private AutoCompleteTextView noteInput(List<String> suggestions) {
+        AutoCompleteTextView input = new AutoCompleteTextView(this);
+        input.setHint("Escribe para buscar notas anteriores");
+        input.setSingleLine(true);
+        input.setTextColor(textColor);
+        input.setHintTextColor(muted);
+        input.setTextSize(14);
+        input.setBackground(rounded(controlSurface(), 16, 1, strokeColor));
+        input.setPadding(dp(12), 0, dp(12), 0);
+        input.setLayoutParams(margins(-1, dp(48), 0, 8));
+        input.setThreshold(1);
+        input.setDropDownVerticalOffset(dp(4));
+        input.setDropDownBackgroundDrawable(rounded(surface, 12, 1, strokeColor));
+        input.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_dropdown_item_1line, suggestions) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                TextView item = (TextView) super.getView(position, convertView, parent);
+                item.setTextColor(textColor);
+                item.setTextSize(14);
+                item.setSingleLine(true);
+                item.setPadding(dp(14), dp(12), dp(14), dp(12));
+                item.setBackgroundColor(surface);
+                return item;
+            }
+        });
+        return input;
+    }
+
+    private LinearLayout.LayoutParams movementTypeParams(boolean last) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(44), 1);
+        params.setMargins(0, 0, last ? 0 : dp(6), dp(10));
+        return params;
+    }
+
+    private void styleMovementTypeButtons(Button[] buttons, int selected) {
+        for (int i = 0; i < buttons.length; i++) {
+            boolean active = i == selected;
+            int color = i == 0 ? expenseColor : (i == 1 ? incomeColor : transferColor);
+            buttons[i].setTextColor(active ? Color.WHITE : muted);
+            buttons[i].setTypeface(Typeface.DEFAULT, active ? Typeface.BOLD : Typeface.NORMAL);
+            buttons[i].setBackground(rounded(active ? color : controlSurface(), 8, 1, active ? color : strokeColor));
+        }
+    }
+
+    private void applyMovementType(int position, Button[] buttons, TextView accountLabel, TextView toAccountLabel,
+                                   Spinner toAccount, TextView categoryLabel, Spinner category) {
+        boolean transfer = position == 2;
+        accountLabel.setText(transfer ? "Cuenta origen" : "Cuenta");
+        toAccountLabel.setVisibility(transfer ? View.VISIBLE : View.GONE);
+        toAccount.setVisibility(transfer ? View.VISIBLE : View.GONE);
+        categoryLabel.setVisibility(transfer ? View.GONE : View.VISIBLE);
+        category.setVisibility(transfer ? View.GONE : View.VISIBLE);
+        styleMovementTypeButtons(buttons, position);
+        if (!transfer) {
+            String kind = position == 1 ? "income" : "expense";
+            category.setAdapter(stringAdapter(db.categories(kind)));
+        }
+    }
+
     private TextView label(String value) {
         TextView v = text(value, 12, true, muted);
         v.setPadding(0, dp(8), 0, 0);
@@ -3188,6 +3285,21 @@ public class MoneyMateActivity extends Activity {
         DatePickerDialog dialog = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
             target.setText(String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth));
         }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH));
+        dialog.show();
+        styleDialog(dialog);
+    }
+
+    private void pickTime(EditText target) {
+        Calendar cal = Calendar.getInstance();
+        try {
+            String[] parts = target.getText().toString().split(":");
+            cal.set(Calendar.HOUR_OF_DAY, Integer.parseInt(parts[0]));
+            cal.set(Calendar.MINUTE, Integer.parseInt(parts[1]));
+        } catch (Exception ignored) {
+        }
+        TimePickerDialog dialog = new TimePickerDialog(this, (view, hour, minute) -> {
+            target.setText(String.format(Locale.US, "%02d:%02d", hour, minute));
+        }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true);
         dialog.show();
         styleDialog(dialog);
     }
