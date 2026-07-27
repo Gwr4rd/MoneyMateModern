@@ -17,7 +17,16 @@ import {
   summary,
   today,
 } from "./lib/finance";
-import { createAccount, downloadSnapshot, uploadSnapshot } from "./lib/supabase";
+import {
+  createAccount,
+  downloadSnapshot,
+  getCurrentUser,
+  signIn,
+  signOut,
+  SYNC_PENDING_KEY,
+  SYNC_REMOTE_KEY,
+  uploadSnapshot,
+} from "./lib/supabase";
 
 export default function App() {
   const [data, setData] = useState(loadData);
@@ -29,7 +38,11 @@ export default function App() {
   const [dialog, setDialog] = useState(null);
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
+  const [syncUser, setSyncUser] = useState(null);
+  const [syncRevision, setSyncRevision] = useState(0);
   const searchRef = useRef(null);
+  const syncTimerRef = useRef(null);
+  const syncOperationRef = useRef(false);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -39,6 +52,83 @@ export default function App() {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     localStorage.setItem("moneymate-theme", dark ? "dark" : "light");
   }, [dark]);
+
+  useEffect(() => {
+    let active = true;
+    getCurrentUser()
+      .then((user) => {
+        if (!active) return;
+        setSyncUser(user);
+        if (user && localStorage.getItem(SYNC_PENDING_KEY) === "1") {
+          setSyncRevision((value) => value + 1);
+        }
+      })
+      .catch((error) => active && setSyncMessage(error.message));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!syncUser || syncRevision === 0) return undefined;
+    window.clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = window.setTimeout(async () => {
+      if (syncOperationRef.current) {
+        setSyncRevision((value) => value + 1);
+        return;
+      }
+      syncOperationRef.current = true;
+      try {
+        const result = await uploadSnapshot(data);
+        if (result?.updated_at) localStorage.setItem(SYNC_REMOTE_KEY, result.updated_at);
+        localStorage.removeItem(SYNC_PENDING_KEY);
+        setSyncMessage("Cambios guardados automáticamente.");
+      } catch (error) {
+        localStorage.setItem(SYNC_PENDING_KEY, "1");
+        setSyncMessage(`Sincronización pendiente: ${error.message}`);
+        syncTimerRef.current = window.setTimeout(
+          () => setSyncRevision((value) => value + 1),
+          15000,
+        );
+      } finally {
+        syncOperationRef.current = false;
+      }
+    }, 900);
+    return () => window.clearTimeout(syncTimerRef.current);
+  }, [syncRevision, syncUser]);
+
+  useEffect(() => {
+    if (!syncUser) return undefined;
+    let active = true;
+    async function pollCloud() {
+      if (!active || syncOperationRef.current || localStorage.getItem(SYNC_PENDING_KEY) === "1") return;
+      syncOperationRef.current = true;
+      try {
+        const remote = await downloadSnapshot();
+        const previous = localStorage.getItem(SYNC_REMOTE_KEY) || "";
+        if (!previous) {
+          localStorage.setItem(SYNC_REMOTE_KEY, remote.updated_at || "");
+        } else if (remote.updated_at && remote.updated_at !== previous) {
+          setData(normalizeSnapshot(remote.data));
+          localStorage.setItem(SYNC_REMOTE_KEY, remote.updated_at);
+          setSyncMessage("Cambios recientes recibidos desde Supabase.");
+        }
+      } catch (error) {
+        if (!String(error.message).includes("Todavia no existe")) {
+          setSyncMessage(`No se pudo comprobar la nube: ${error.message}`);
+        }
+      } finally {
+        syncOperationRef.current = false;
+      }
+    }
+    const firstCheck = window.setTimeout(pollCloud, 2500);
+    const interval = window.setInterval(pollCloud, 30000);
+    return () => {
+      active = false;
+      window.clearTimeout(firstCheck);
+      window.clearInterval(interval);
+    };
+  }, [syncUser]);
 
   const range = useMemo(() => rangeFor(scope, filters.anchor), [scope, filters.anchor]);
   const visibleTransactions = useMemo(
@@ -59,38 +149,68 @@ export default function App() {
   }
 
   function saveMovement(transaction) {
+    localStorage.setItem(SYNC_PENDING_KEY, "1");
     setData((current) => ({
       ...current,
       transactions: [transaction, ...current.transactions].sort(sortTransactions),
     }));
+    setSyncRevision((value) => value + 1);
     setDialog(null);
     setFilters((current) => ({ ...current, anchor: transaction.date }));
   }
 
-  async function syncUpload(email, password) {
+  async function syncLogin(email, password) {
     setSyncBusy(true);
     setSyncMessage("");
+    syncOperationRef.current = true;
     try {
-      await uploadSnapshot(email, password, data);
-      setSyncMessage("Copia subida correctamente.");
+      const result = await signIn(email, password);
+      setSyncUser(result.user);
+      setSyncMessage("Cuenta conectada. La sesión permanecerá activa.");
+      if (localStorage.getItem(SYNC_PENDING_KEY) === "1") {
+        setSyncRevision((value) => value + 1);
+      }
     } catch (error) {
       setSyncMessage(error.message);
     } finally {
+      syncOperationRef.current = false;
       setSyncBusy(false);
     }
   }
 
-  async function syncDownload(email, password) {
+  async function syncUpload() {
+    setSyncBusy(true);
+    setSyncMessage("");
+    syncOperationRef.current = true;
+    try {
+      const result = await uploadSnapshot(data);
+      if (result?.updated_at) localStorage.setItem(SYNC_REMOTE_KEY, result.updated_at);
+      localStorage.removeItem(SYNC_PENDING_KEY);
+      setSyncMessage("Copia subida correctamente.");
+    } catch (error) {
+      localStorage.setItem(SYNC_PENDING_KEY, "1");
+      setSyncMessage(error.message);
+    } finally {
+      syncOperationRef.current = false;
+      setSyncBusy(false);
+    }
+  }
+
+  async function syncDownload() {
     if (!window.confirm("La copia de Supabase reemplazara los datos guardados en este navegador.")) return;
     setSyncBusy(true);
     setSyncMessage("");
+    syncOperationRef.current = true;
     try {
-      const remote = await downloadSnapshot(email, password);
+      const remote = await downloadSnapshot();
       setData(normalizeSnapshot(remote.data));
+      if (remote.updated_at) localStorage.setItem(SYNC_REMOTE_KEY, remote.updated_at);
+      localStorage.removeItem(SYNC_PENDING_KEY);
       setSyncMessage("Datos descargados correctamente.");
     } catch (error) {
       setSyncMessage(error.message);
     } finally {
+      syncOperationRef.current = false;
       setSyncBusy(false);
     }
   }
@@ -98,15 +218,41 @@ export default function App() {
   async function syncCreateAccount(email, password) {
     setSyncBusy(true);
     setSyncMessage("");
+    syncOperationRef.current = true;
     try {
       const result = await createAccount(email, password);
+      if (result.session?.user) setSyncUser(result.session.user);
       setSyncMessage(result.session
-        ? "Cuenta creada y conectada. Ya puedes subir tus datos."
+        ? "Cuenta creada y conectada. La sesión permanecerá activa."
         : "Cuenta creada. Revisa tu correo para confirmarla antes de iniciar sesion.");
     } catch (error) {
       setSyncMessage(error.message);
     } finally {
+      syncOperationRef.current = false;
       setSyncBusy(false);
+    }
+  }
+
+  async function syncSignOut() {
+    setSyncBusy(true);
+    syncOperationRef.current = true;
+    try {
+      await signOut();
+      setSyncUser(null);
+      setSyncMessage("Sesión cerrada en este navegador.");
+    } catch (error) {
+      setSyncMessage(error.message);
+    } finally {
+      syncOperationRef.current = false;
+      setSyncBusy(false);
+    }
+  }
+
+  async function syncConfigSaved() {
+    try {
+      setSyncUser(await getCurrentUser());
+    } catch {
+      setSyncUser(null);
     }
   }
 
@@ -193,7 +339,11 @@ export default function App() {
           onClose={() => setDialog(null)}
           onUpload={syncUpload}
           onDownload={syncDownload}
+          onSignIn={syncLogin}
+          onSignOut={syncSignOut}
           onCreateAccount={syncCreateAccount}
+          onConfigSaved={syncConfigSaved}
+          user={syncUser}
           busy={syncBusy}
           message={syncMessage}
         />

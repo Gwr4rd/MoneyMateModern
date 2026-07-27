@@ -3,7 +3,7 @@
 ## 1. Supabase
 
 1. Crea un proyecto en [Supabase](https://supabase.com/dashboard).
-2. Abre `SQL Editor`, pega el contenido de `supabase/schema.sql` y ejecutalo.
+2. Abre `SQL Editor`, pega el contenido de `supabase/schema.sql` y ejecutalo. Tambien puedes copiar el mismo script desde el manual integrado de Android o web.
 3. En `Authentication > Providers > Email`, deja habilitado Email.
 4. Crea un usuario en `Authentication > Users` o habilita el registro de usuarios.
 5. Copia `Project URL` y la clave publica desde `Project Settings > API`.
@@ -18,9 +18,18 @@ La tabla usa Row Level Security. Cada usuario solo puede leer o modificar la fil
 4. Pulsa `Guardar conexión`.
 5. En la pantalla siguiente elige `Iniciar sesión` o `Crear cuenta`.
 6. Escribe el correo y la contraseña.
-7. Después de conectar la cuenta, usa `Subir copia local` o `Descargar copia de la nube`.
+7. Después de conectar la cuenta, usa `Subir copia local` o `Descargar copia de la nube` para elegir la copia inicial.
 
-La contraseña no se guarda en las preferencias del dispositivo.
+La contraseña no se guarda en las preferencias del dispositivo. Se guardan el identificador de usuario y los tokens de sesión dentro de las preferencias privadas de Android. El acceso se renueva automáticamente antes de vencer.
+
+Al actualizar desde una version anterior a `1.2.0`, inicia sesion una ultima vez. Las versiones anteriores no conservaban el token necesario para renovar la sesion.
+
+Después de la conexión inicial:
+
+- Cada modificación local deja una subida pendiente y se sincroniza automáticamente.
+- La aplicación comprueba cambios remotos cada 30 segundos mientras esta abierta.
+- Si no hay red, la subida queda pendiente para el siguiente intento.
+- `Manual y script SQL` abre la guia completa y permite copiar el script sin salir de la aplicación.
 
 ### Web
 
@@ -28,9 +37,13 @@ La contraseña no se guarda en las preferencias del dispositivo.
 2. Escribe la URL del proyecto y la clave publica.
 3. Pulsa `Guardar conexión`.
 4. Inicia sesión o crea una cuenta.
-5. Usa `Subir` o `Descargar` según la copia que quieras conservar.
+5. Usa `Subir` o `Descargar` para elegir la copia inicial.
 
-La configuración se guarda en ese navegador. También puedes preconfigurar un despliegue copiando `web/.env.example` como `web/.env`:
+La configuración y la sesión se guardan en ese navegador. El cliente de Supabase renueva el acceso automáticamente. Los cambios locales se suben después de guardarlos y la aplicación comprueba la nube cada 30 segundos.
+
+El botón `Manual y script SQL` muestra la guia completa y permite copiar el script seguro desde la web.
+
+También puedes preconfigurar un despliegue copiando `web/.env.example` como `web/.env`:
 
 ```dotenv
 VITE_SUPABASE_URL=https://TU_PROYECTO.supabase.co
@@ -78,14 +91,14 @@ Referencias:
 ## 3. Subir el proyecto a GitHub desde la web
 
 No se necesita ningun archivo comprimido. Usa la carpeta preparada
-`MoneyMateModern-GitHub-v1.1.1` y sigue la guia
+`MoneyMateModern-GitHub-v1.2.0` y sigue la guia
 [`SUBIR_A_GITHUB_WEB.md`](SUBIR_A_GITHUB_WEB.md).
 
 Resumen:
 
 1. Crea un repositorio vacio en [GitHub](https://github.com/new).
 2. No agregues README, licencia ni `.gitignore` al crearlo, porque ya existen en el proyecto.
-3. Abre la carpeta `MoneyMateModern-GitHub-v1.1.1` en el Explorador de Windows.
+3. Abre la carpeta `MoneyMateModern-GitHub-v1.2.0` en el Explorador de Windows.
 4. Selecciona todo el contenido interior de la carpeta, no la carpeta contenedora.
 5. En GitHub abre `Add file > Upload files` y arrastra la seleccion al navegador.
 6. Espera a que termine la carga y confirma con `Commit changes`.
@@ -100,10 +113,10 @@ Referencias:
 ## 4. Crear el Release de GitHub
 
 1. Abre `Releases > Draft a new release`.
-2. Crea la etiqueta `v1.1.1`.
-3. Usa como titulo `MoneyMate Modern 1.1.1`.
+2. Crea la etiqueta `v1.2.0`.
+3. Usa como titulo `MoneyMate Modern 1.2.0`.
 4. Pega el contenido de `RELEASE_NOTES.md`.
-5. Adjunta `MoneyMateModern-release-signed-v1.1.1.apk`.
+5. Adjunta `MoneyMateModern-release-signed-v1.2.0.apk`.
 6. Publica el release.
 
 Referencia: [Administrar Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository).

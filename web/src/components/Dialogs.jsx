@@ -1,6 +1,21 @@
-import { useState } from "react";
-import { CloudDownload, CloudUpload, FileSpreadsheet, Save, UserPlus, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  ArrowLeft,
+  BookOpen,
+  CheckCircle2,
+  CloudDownload,
+  CloudUpload,
+  Copy,
+  ExternalLink,
+  FileSpreadsheet,
+  LogIn,
+  LogOut,
+  Save,
+  UserPlus,
+  X,
+} from "lucide-react";
 import { getSupabaseConfig, isSupabaseConfigured, saveSupabaseConfig } from "../lib/supabase";
+import { SUPABASE_DASHBOARD_URL, SUPABASE_SQL } from "../lib/supabaseSetup";
 import { today } from "../lib/finance";
 
 export function MovementDialog({ data, onClose, onSave }) {
@@ -82,9 +97,20 @@ export function MovementDialog({ data, onClose, onSave }) {
   );
 }
 
-export function SyncDialog({ onClose, onUpload, onDownload, onCreateAccount, busy, message }) {
+export function SyncDialog({
+  onClose,
+  onUpload,
+  onDownload,
+  onSignIn,
+  onSignOut,
+  onCreateAccount,
+  onConfigSaved,
+  user,
+  busy,
+  message,
+}) {
   const initialConfig = getSupabaseConfig();
-  const [stage, setStage] = useState(() => isSupabaseConfigured() ? "account" : "config");
+  const [stage, setStage] = useState(() => isSupabaseConfigured() ? (user ? "connected" : "account") : "config");
   const [url, setUrl] = useState(initialConfig.url);
   const [key, setKey] = useState(initialConfig.key);
   const [accountMode, setAccountMode] = useState("login");
@@ -92,19 +118,53 @@ export function SyncDialog({ onClose, onUpload, onDownload, onCreateAccount, bus
   const [password, setPassword] = useState("");
   const [localMessage, setLocalMessage] = useState("");
 
+  useEffect(() => {
+    setStage((current) => {
+      if (user) return "connected";
+      return current === "connected" ? "account" : current;
+    });
+  }, [user]);
+
   function storeConnection() {
     try {
       saveSupabaseConfig(url, key);
       setLocalMessage("Conexion guardada. Ahora conecta tu cuenta.");
       setStage("account");
+      Promise.resolve(onConfigSaved?.());
     } catch (error) {
       setLocalMessage(error.message);
     }
   }
 
+  async function copySql() {
+    try {
+      await navigator.clipboard.writeText(SUPABASE_SQL);
+      setLocalMessage("Script SQL copiado.");
+    } catch {
+      const area = document.createElement("textarea");
+      area.value = SUPABASE_SQL;
+      document.body.appendChild(area);
+      area.select();
+      document.execCommand("copy");
+      area.remove();
+      setLocalMessage("Script SQL copiado.");
+    }
+  }
+
+  const connectionStage = user ? "connected" : (isSupabaseConfigured() ? "account" : "config");
+
   return (
     <Modal title="Cuenta y sincronizacion" onClose={onClose}>
       <div className="sync-form">
+        {stage === "help" ? (
+          <SupabaseGuide
+            onBack={() => {
+              setLocalMessage("");
+              setStage(connectionStage);
+            }}
+            onCopy={copySql}
+          />
+        ) : null}
         {stage === "config" ? (
           <>
             <div className="sync-status">Supabase no configurado. Guarda primero la conexion del proyecto.</div>
@@ -118,8 +178,12 @@ export function SyncDialog({ onClose, onUpload, onDownload, onCreateAccount, bus
             <button className="dialog-primary" onClick={storeConnection}>
               <Save size={19} /> Guardar conexion
             </button>
+            <button className="sync-guide-button" onClick={() => setStage("help")}>
+              <BookOpen size={19} /> Como crear y configurar Supabase
+            </button>
           </>
-        ) : (
+        ) : null}
+        {stage === "account" ? (
           <>
             <div className="sync-status ready">Configuracion de Supabase guardada. Conecta tu cuenta para sincronizar.</div>
             <div className="sync-account-tabs" role="tablist" aria-label="Acceso a Supabase">
@@ -133,23 +197,90 @@ export function SyncDialog({ onClose, onUpload, onDownload, onCreateAccount, bus
                 <UserPlus size={19} /> Crear cuenta
               </button>
             ) : (
-              <div className="dialog-actions">
-                <button disabled={busy || !email || !password} onClick={() => onDownload(email, password)}>
-                  <CloudDownload size={19} /> Descargar
-                </button>
-                <button className="dialog-primary" disabled={busy || !email || !password} onClick={() => onUpload(email, password)}>
-                  <CloudUpload size={19} /> Subir
-                </button>
-              </div>
+              <button className="dialog-primary" disabled={busy || !email || !password} onClick={() => onSignIn(email, password)}>
+                <LogIn size={19} /> Iniciar sesion
+              </button>
             )}
+            <button className="sync-guide-button" onClick={() => setStage("help")}>
+              <BookOpen size={19} /> Manual y script SQL
+            </button>
             <button className="sync-change" onClick={() => { setLocalMessage(""); setStage("config"); }}>
               Cambiar conexion de Supabase
             </button>
           </>
-        )}
+        ) : null}
+        {stage === "connected" ? (
+          <>
+            <div className="sync-status connected">
+              <CheckCircle2 size={21} />
+              <span><strong>Cuenta conectada</strong><small>{user?.email}</small><small>Sesion activa y sincronizacion automatica</small></span>
+            </div>
+            <div className="dialog-actions">
+              <button disabled={busy} onClick={onDownload}>
+                <CloudDownload size={19} /> Descargar
+              </button>
+              <button className="dialog-primary" disabled={busy} onClick={onUpload}>
+                <CloudUpload size={19} /> Subir ahora
+              </button>
+            </div>
+            <button className="sync-guide-button" onClick={() => setStage("help")}>
+              <BookOpen size={19} /> Manual y script SQL
+            </button>
+            <button className="sync-change" onClick={() => { setLocalMessage(""); setStage("config"); }}>
+              Cambiar conexion de Supabase
+            </button>
+            <button className="sync-signout" disabled={busy} onClick={onSignOut}>
+              <LogOut size={18} /> Cerrar sesion
+            </button>
+          </>
+        ) : null}
         {localMessage || message ? <p className="dialog-message">{localMessage || message}</p> : null}
       </div>
     </Modal>
+  );
+}
+
+function SupabaseGuide({ onBack, onCopy }) {
+  return (
+    <div className="sync-guide">
+      <button className="sync-guide-back" onClick={onBack}><ArrowLeft size={20} /> Volver a la conexion</button>
+      <div className="sync-guide-heading">
+        <h2>Configurar Supabase</h2>
+        <p>Sigue estos pasos una sola vez para activar la sincronizacion segura por cuenta.</p>
+      </div>
+      <GuideStep number="1" title="Crear el proyecto">
+        Abre Supabase, crea un proyecto llamado MoneyMate Modern, guarda la contrasena de la base de datos y elige la region mas cercana.
+      </GuideStep>
+      <a className="dialog-primary sync-external" href={SUPABASE_DASHBOARD_URL} target="_blank" rel="noreferrer">
+        <ExternalLink size={19} /> Abrir Supabase
+      </a>
+      <GuideStep number="2" title="Crear la tabla segura">
+        En SQL Editor pulsa New query, pega el script de configuracion y selecciona Run.
+      </GuideStep>
+      <button className="sync-guide-button" onClick={onCopy}><Copy size={19} /> Copiar script SQL</button>
+      <GuideStep number="3" title="Habilitar correo y contrasena">
+        En Authentication &gt; Sign In / Providers abre Email y activa el proveedor. Para una prueba puedes desactivar Confirm email.
+      </GuideStep>
+      <GuideStep number="4" title="Copiar la conexion">
+        En Connect o Settings &gt; API Keys copia Project URL y Publishable key. Nunca copies Secret key ni service_role.
+      </GuideStep>
+      <GuideStep number="5" title="Conectar tus dispositivos">
+        Guarda la URL y la clave publica. Crea la cuenta una vez e inicia sesion con la misma cuenta en Android y web.
+      </GuideStep>
+      <div className="sync-guide-ready">
+        <CheckCircle2 size={21} />
+        <span>La configuracion esta lista cuando Authentication &gt; Users muestra tu correo y money_snapshots contiene una fila despues de la primera subida.</span>
+      </div>
+    </div>
+  );
+}
+
+function GuideStep({ number, title, children }) {
+  return (
+    <div className="sync-guide-step">
+      <span className="sync-guide-number">{number}</span>
+      <div><strong>{title}</strong><p>{children}</p></div>
+    </div>
   );
 }
 

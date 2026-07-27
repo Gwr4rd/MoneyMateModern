@@ -772,6 +772,26 @@ select:focus-visible {
   color: var(--green);
 }
 
+.sync-status.connected {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.sync-status.connected span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.sync-status.connected small {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .sync-account-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -803,6 +823,104 @@ select:focus-visible {
   background: transparent;
   color: var(--green);
   cursor: pointer;
+}
+
+.sync-guide-button,
+.sync-signout,
+.sync-guide-back {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.sync-signout {
+  border-color: color-mix(in srgb, var(--red) 38%, var(--border));
+  color: var(--red);
+}
+
+.sync-guide {
+  display: grid;
+  gap: 10px;
+}
+
+.sync-guide-back {
+  width: max-content;
+  min-height: 34px;
+  justify-content: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--green);
+}
+
+.sync-guide-heading {
+  padding: 4px 0 2px;
+}
+
+.sync-guide-heading h2 {
+  font-size: 22px;
+}
+
+.sync-guide-heading p,
+.sync-guide-step p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 12px;
+}
+
+.sync-guide-step {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+
+.sync-guide-number {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--green);
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.sync-guide-step strong {
+  font-size: 14px;
+}
+
+.sync-external {
+  text-decoration: none;
+}
+
+.sync-guide-ready {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--green) 30%, var(--border));
+  border-radius: 6px;
+  background: var(--green-soft);
+  color: var(--green);
+  line-height: 1.4;
+  font-size: 12px;
+}
+
+.sync-guide-ready svg {
+  flex: 0 0 auto;
 }
 
 .dialog-message {

@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
@@ -14,6 +16,8 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.InsetDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.OpenableColumns;
 import android.text.Spannable;
 import android.text.SpannableString;
@@ -89,6 +93,18 @@ public final class MainActivity extends Activity {
     private boolean importInProgress;
     private boolean showHiddenAccounts;
     private SharedPreferences prefs;
+    private final Handler syncHandler = new Handler(Looper.getMainLooper());
+    private final Object syncLock = new Object();
+    private boolean syncRunning;
+    private volatile boolean activityResumed;
+    private final Runnable pendingAutoSync = this::runPendingAutoSync;
+    private final Runnable cloudPoll = new Runnable() {
+        @Override
+        public void run() {
+            checkForCloudUpdates();
+            if (activityResumed) syncHandler.postDelayed(this, 30000);
+        }
+    };
     private boolean darkMode;
     private int bg;
     private int surface;
@@ -117,6 +133,25 @@ public final class MainActivity extends Activity {
         period = db.latestMonth();
         statsAnchorDate = db.latestDate();
         draw();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        activityResumed = true;
+        if (prefs != null) {
+            if (prefs.getBoolean("supabase_pending_upload", false)) scheduleAutoSync();
+            syncHandler.removeCallbacks(cloudPoll);
+            syncHandler.postDelayed(cloudPoll, 2500);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        activityResumed = false;
+        syncHandler.removeCallbacks(cloudPoll);
+        syncHandler.removeCallbacks(pendingAutoSync);
+        super.onPause();
     }
 
     @Override
@@ -1142,6 +1177,7 @@ public final class MainActivity extends Activity {
             }
         }
         period = d.length() >= 7 ? d.substring(0, 7) : period;
+        markLocalDataChanged();
         return true;
     }
 
@@ -1192,6 +1228,7 @@ public final class MainActivity extends Activity {
                 .setNegativeButton("No", null)
                 .setPositiveButton("Sí, eliminar", (d, w) -> {
                     db.deleteMovement(row);
+                    markLocalDataChanged();
                     renderScreen();
                 })
                 .create();
@@ -1245,11 +1282,14 @@ public final class MainActivity extends Activity {
                     } else {
                         db.updateAccount(edit.id, edit.name, name.getText().toString(), currency.getText().toString(), type.getSelectedItem().toString(), parse(balance.getText().toString()), description.getText().toString(), includeTotal.isChecked(), hidden.isChecked());
                     }
+                    markLocalDataChanged();
                     renderScreen();
                 });
         if (edit != null) {
             builder.setNeutralButton("Eliminar", (d, w) -> {
-                if (!db.deleteAccount(edit.id, edit.name)) {
+                if (db.deleteAccount(edit.id, edit.name)) {
+                    markLocalDataChanged();
+                } else {
                     toast("No se puede eliminar una cuenta con movimientos.");
                 }
                 renderScreen();
@@ -1282,6 +1322,7 @@ public final class MainActivity extends Activity {
                 .setPositiveButton("Agregar", (d, w) -> {
                     if (name.getText().toString().trim().isEmpty()) return;
                     db.addCategory(name.getText().toString(), categoryKind(kind));
+                    markLocalDataChanged();
                     renderScreen();
                 })
                 .create();
@@ -1316,10 +1357,13 @@ public final class MainActivity extends Activity {
                 .setPositiveButton("Guardar", (d, w) -> {
                     if (name.getText().toString().trim().isEmpty()) return;
                     db.updateCategory(category.id, category.name, name.getText().toString(), categoryKind(kind));
+                    markLocalDataChanged();
                     renderScreen();
                 })
                 .setNeutralButton("Eliminar", (d, w) -> {
-                    if (!db.deleteCategory(category.id, category.name)) {
+                    if (db.deleteCategory(category.id, category.name)) {
+                        markLocalDataChanged();
+                    } else {
                         toast("No se puede eliminar una categoria con movimientos.");
                     }
                     renderScreen();
@@ -1374,6 +1418,7 @@ public final class MainActivity extends Activity {
                 .setTitle("Moneda por pais")
                 .setSingleChoiceItems(labels, checked, (dlg, which) -> {
                     prefs.edit().putString("currency_code", codes[which]).apply();
+                    markLocalDataChanged();
                     dlg.dismiss();
                     renderScreen();
                     toast("Moneda: " + labels[which]);
@@ -1389,6 +1434,8 @@ public final class MainActivity extends Activity {
         String key = prefs.getString("supabase_key", "").trim();
         if (url.isEmpty() || key.isEmpty()) {
             supabaseConfigurationDialog();
+        } else if (hasStoredSupabaseSession()) {
+            supabaseActionsDialog(url, key);
         } else {
             supabaseAccountDialog();
         }
@@ -1408,6 +1455,8 @@ public final class MainActivity extends Activity {
         key.setText(prefs.getString("supabase_key", ""));
         form.addView(url);
         form.addView(key);
+        Button guide = iconSmallButton("Cómo crear y configurar Supabase", R.drawable.ic_action_help, null);
+        form.addView(guide, new LinearLayout.LayoutParams(-1, dp(48)));
         form.addView(text("La clave debe ser la publica (publishable o anon). Nunca uses service_role.", 12, false, muted));
 
         AlertDialog dialog = new AlertDialog.Builder(this)
@@ -1424,14 +1473,23 @@ public final class MainActivity extends Activity {
                     toast("Ingresa una URL https y la clave publica.");
                     return;
                 }
+                String previousUrl = prefs.getString("supabase_url", "");
+                String previousKey = prefs.getString("supabase_key", "");
                 prefs.edit()
                         .putString("supabase_url", projectUrl)
                         .putString("supabase_key", publicKey)
                         .apply();
+                if (!projectUrl.equals(previousUrl) || !publicKey.equals(previousKey)) {
+                    clearSupabaseSession();
+                }
                 dialog.dismiss();
                 toast("Conexión de Supabase guardada.");
                 supabaseAccountDialog();
             });
+        });
+        guide.setOnClickListener(v -> {
+            dialog.dismiss();
+            supabaseHelpDialog();
         });
         dialog.show();
         styleDialog(dialog);
@@ -1442,6 +1500,10 @@ public final class MainActivity extends Activity {
         String publicKey = prefs.getString("supabase_key", "").trim();
         if (projectUrl.isEmpty() || publicKey.isEmpty()) {
             supabaseConfigurationDialog();
+            return;
+        }
+        if (hasStoredSupabaseSession()) {
+            supabaseActionsDialog(projectUrl, publicKey);
             return;
         }
 
@@ -1471,9 +1533,11 @@ public final class MainActivity extends Activity {
         form.addView(email);
         form.addView(password);
 
-        Button accountAction = actionWide("Entrar y sincronizar", null);
+        Button accountAction = iconActionWide("Iniciar sesión", R.drawable.ic_menu_sync, null);
         form.addView(accountAction);
-        Button changeConnection = smallButton("Cambiar conexión de Supabase", null);
+        Button guide = iconSmallButton("Cómo crear y configurar Supabase", R.drawable.ic_action_help, null);
+        form.addView(guide, new LinearLayout.LayoutParams(-1, dp(44)));
+        Button changeConnection = iconSmallButton("Cambiar conexión de Supabase", R.drawable.ic_menu_settings, null);
         form.addView(changeConnection, new LinearLayout.LayoutParams(-1, dp(44)));
 
         Runnable refreshMode = () -> {
@@ -1481,7 +1545,7 @@ public final class MainActivity extends Activity {
             createTab.setTextColor(createMode[0] ? Color.WHITE : muted);
             loginTab.setBackground(rounded(createMode[0] ? surface2 : actionColor, 12, 0, strokeColor));
             createTab.setBackground(rounded(createMode[0] ? actionColor : surface2, 12, 0, strokeColor));
-            accountAction.setText(createMode[0] ? "Crear cuenta" : "Entrar y sincronizar");
+            accountAction.setText(createMode[0] ? "Crear cuenta" : "Iniciar sesión");
         };
         loginTab.setOnClickListener(v -> {
             createMode[0] = false;
@@ -1509,6 +1573,10 @@ public final class MainActivity extends Activity {
             dialog.dismiss();
             verifySupabaseAccount(projectUrl, publicKey, userEmail, userPassword, createMode[0]);
         });
+        guide.setOnClickListener(v -> {
+            dialog.dismiss();
+            supabaseHelpDialog();
+        });
         changeConnection.setOnClickListener(v -> {
             dialog.dismiss();
             supabaseConfigurationDialog();
@@ -1529,8 +1597,9 @@ public final class MainActivity extends Activity {
                         toast("Cuenta creada. Revisa tu correo para confirmarla.");
                         supabaseAccountDialog();
                     } else {
+                        saveSupabaseSession(session, email);
                         toast(createAccount ? "Cuenta creada y conectada." : "Cuenta conectada.");
-                        supabaseActionsDialog(url, key, email, password);
+                        supabaseActionsDialog(url, key);
                     }
                 });
             } catch (Exception ex) {
@@ -1542,60 +1611,93 @@ public final class MainActivity extends Activity {
         }).start();
     }
 
-    private void supabaseActionsDialog(String url, String key, String email, String password) {
+    private void supabaseActionsDialog(String url, String key) {
+        String email = prefs.getString("supabase_email", "");
         LinearLayout form = new LinearLayout(this);
         form.setOrientation(LinearLayout.VERTICAL);
         form.setPadding(dp(12), dp(8), dp(12), dp(4));
-        TextView status = text("Cuenta conectada\n" + email, 13, true, incomeColor);
+        TextView status = text(
+                "Cuenta conectada\n" + email
+                        + "\nSincronización automática activa"
+                        + "\n" + lastSupabaseSyncLabel(),
+                13,
+                true,
+                incomeColor
+        );
         status.setBackground(rounded(surface2, 10, 0, strokeColor));
         status.setPadding(dp(12), dp(10), dp(12), dp(10));
         form.addView(status, margins(-1, -2, 0, 12));
         AlertDialog[] holder = new AlertDialog[1];
-        form.addView(actionWide("Subir copia local", v -> {
+        form.addView(iconActionWide("Subir copia local ahora", R.drawable.ic_menu_sync, v -> {
             holder[0].dismiss();
-            runSupabaseSync(true, url, key, email, password);
+            runSupabaseSync(true, url, key);
         }));
-        form.addView(smallButton("Descargar copia de la nube", v -> {
+        form.addView(iconSmallButton("Descargar copia de la nube", R.drawable.ic_menu_import, v -> {
             holder[0].dismiss();
-            confirmSupabaseDownload(url, key, email, password);
+            confirmSupabaseDownload(url, key);
         }), new LinearLayout.LayoutParams(-1, dp(48)));
-        form.addView(smallButton("Cambiar conexión de Supabase", v -> {
+        form.addView(iconSmallButton("Manual y script SQL", R.drawable.ic_action_help, v -> {
+            holder[0].dismiss();
+            supabaseHelpDialog();
+        }), new LinearLayout.LayoutParams(-1, dp(44)));
+        form.addView(iconSmallButton("Cambiar conexión de Supabase", R.drawable.ic_menu_settings, v -> {
             holder[0].dismiss();
             supabaseConfigurationDialog();
         }), new LinearLayout.LayoutParams(-1, dp(44)));
+        form.addView(iconSmallButton("Cerrar sesión en este dispositivo", R.drawable.ic_action_logout, v -> {
+            holder[0].dismiss();
+            clearSupabaseSession();
+            toast("Sesión cerrada.");
+            supabaseAccountDialog();
+        }), new LinearLayout.LayoutParams(-1, dp(44)));
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(form);
         holder[0] = new AlertDialog.Builder(this)
                 .setTitle("Sincronización")
-                .setView(form)
+                .setView(scroll)
                 .setPositiveButton("Cerrar", null)
                 .create();
         holder[0].show();
         styleDialog(holder[0]);
     }
 
-    private void confirmSupabaseDownload(String url, String key, String email, String password) {
+    private void confirmSupabaseDownload(String url, String key) {
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Reemplazar datos locales")
                 .setMessage("La copia de Supabase reemplazara las cuentas, categorias y transacciones guardadas en este dispositivo.")
                 .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Descargar", (d, w) -> runSupabaseSync(false, url, key, email, password))
+                .setPositiveButton("Descargar", (d, w) -> runSupabaseSync(false, url, key))
                 .create();
         dialog.show();
         styleDialog(dialog);
     }
 
-    private void runSupabaseSync(boolean upload, String url, String key, String email, String password) {
+    private void runSupabaseSync(boolean upload, String url, String key) {
+        if (!claimSyncOperation()) {
+            toast("Ya hay una sincronización en curso.");
+            return;
+        }
         toast(upload ? "Subiendo datos..." : "Descargando datos...");
         new Thread(() -> {
             try {
-                SupabaseSync.Session session = SupabaseSync.signIn(url.trim(), key.trim(), email.trim(), password);
+                SupabaseSync.Session session = storedSupabaseSession(url, key);
                 if (upload) {
-                    SupabaseSync.upload(url.trim(), key.trim(), session, cloudSnapshotJson());
+                    long revision = prefs.getLong("supabase_local_revision", 0);
+                    String updatedAt = SupabaseSync.upload(url.trim(), key.trim(), session, cloudSnapshotJson());
+                    recordUploadSuccess(revision, updatedAt);
                 } else {
                     SupabaseSync.RemoteSnapshot remote = SupabaseSync.download(url.trim(), key.trim(), session);
                     replaceFromCloudSnapshot(remote.data);
+                    prefs.edit()
+                            .putString("supabase_remote_updated_at", remote.updatedAt)
+                            .putBoolean("supabase_pending_upload", false)
+                            .apply();
                 }
                 runOnUiThread(() -> {
-                    prefs.edit().putLong("last_supabase_sync", System.currentTimeMillis()).apply();
+                    prefs.edit()
+                            .putLong("last_supabase_sync", System.currentTimeMillis())
+                            .remove("supabase_last_error")
+                            .apply();
                     period = db.latestMonth();
                     statsAnchorDate = db.latestDate();
                     toast(upload ? "Copia subida a Supabase." : "Datos descargados desde Supabase.");
@@ -1603,8 +1705,264 @@ public final class MainActivity extends Activity {
                 });
             } catch (Exception ex) {
                 runOnUiThread(() -> toast("No se pudo sincronizar: " + ex.getMessage()));
+            } finally {
+                releaseSyncOperation();
             }
         }).start();
+    }
+
+    private void markLocalDataChanged() {
+        long revision = prefs.getLong("supabase_local_revision", 0) + 1;
+        prefs.edit()
+                .putLong("supabase_local_revision", revision)
+                .putBoolean("supabase_pending_upload", true)
+                .apply();
+        scheduleAutoSync();
+    }
+
+    private void scheduleAutoSync() {
+        if (!hasStoredSupabaseSession()) return;
+        syncHandler.removeCallbacks(pendingAutoSync);
+        syncHandler.postDelayed(pendingAutoSync, 900);
+    }
+
+    private void runPendingAutoSync() {
+        if (!prefs.getBoolean("supabase_pending_upload", false) || !hasStoredSupabaseSession()) return;
+        String url = prefs.getString("supabase_url", "").trim();
+        String key = prefs.getString("supabase_key", "").trim();
+        if (url.isEmpty() || key.isEmpty()) return;
+        if (!claimSyncOperation()) {
+            syncHandler.postDelayed(pendingAutoSync, 1200);
+            return;
+        }
+        long revision = prefs.getLong("supabase_local_revision", 0);
+        new Thread(() -> {
+            try {
+                SupabaseSync.Session session = storedSupabaseSession(url, key);
+                String updatedAt = SupabaseSync.upload(url, key, session, cloudSnapshotJson());
+                recordUploadSuccess(revision, updatedAt);
+            } catch (Exception ex) {
+                prefs.edit().putString("supabase_last_error", String.valueOf(ex.getMessage())).apply();
+            } finally {
+                releaseSyncOperation();
+                if (activityResumed && prefs.getBoolean("supabase_pending_upload", false)) {
+                    long currentRevision = prefs.getLong("supabase_local_revision", 0);
+                    syncHandler.postDelayed(pendingAutoSync, currentRevision == revision ? 15000 : 900);
+                }
+            }
+        }).start();
+    }
+
+    private void recordUploadSuccess(long revision, String updatedAt) {
+        SharedPreferences.Editor editor = prefs.edit()
+                .putLong("last_supabase_sync", System.currentTimeMillis())
+                .remove("supabase_last_error");
+        if (revision == prefs.getLong("supabase_local_revision", 0)) {
+            editor.putBoolean("supabase_pending_upload", false);
+        }
+        if (updatedAt != null && !updatedAt.isEmpty()) {
+            editor.putString("supabase_remote_updated_at", updatedAt);
+        }
+        editor.apply();
+    }
+
+    private void checkForCloudUpdates() {
+        if (!hasStoredSupabaseSession()
+                || prefs.getBoolean("supabase_pending_upload", false)
+                || !claimSyncOperation()) {
+            return;
+        }
+        String url = prefs.getString("supabase_url", "").trim();
+        String key = prefs.getString("supabase_key", "").trim();
+        if (url.isEmpty() || key.isEmpty()) {
+            releaseSyncOperation();
+            return;
+        }
+        new Thread(() -> {
+            boolean changed = false;
+            try {
+                SupabaseSync.Session session = storedSupabaseSession(url, key);
+                SupabaseSync.RemoteSnapshot remote = SupabaseSync.download(url, key, session);
+                String previous = prefs.getString("supabase_remote_updated_at", "");
+                if (previous.isEmpty()) {
+                    prefs.edit().putString("supabase_remote_updated_at", remote.updatedAt).apply();
+                } else if (!remote.updatedAt.isEmpty() && !remote.updatedAt.equals(previous)) {
+                    replaceFromCloudSnapshot(remote.data);
+                    prefs.edit()
+                            .putString("supabase_remote_updated_at", remote.updatedAt)
+                            .putLong("last_supabase_sync", System.currentTimeMillis())
+                            .remove("supabase_last_error")
+                            .apply();
+                    changed = true;
+                }
+            } catch (Exception ex) {
+                String message = String.valueOf(ex.getMessage());
+                if (!message.contains("Todavia no existe")) {
+                    prefs.edit().putString("supabase_last_error", message).apply();
+                }
+            } finally {
+                releaseSyncOperation();
+            }
+            if (changed) {
+                runOnUiThread(() -> {
+                    period = db.latestMonth();
+                    statsAnchorDate = db.latestDate();
+                    draw();
+                    toast("Cambios recibidos desde Supabase.");
+                });
+            }
+        }).start();
+    }
+
+    private boolean claimSyncOperation() {
+        synchronized (syncLock) {
+            if (syncRunning) return false;
+            syncRunning = true;
+            return true;
+        }
+    }
+
+    private void releaseSyncOperation() {
+        synchronized (syncLock) {
+            syncRunning = false;
+        }
+    }
+
+    private boolean hasStoredSupabaseSession() {
+        return prefs != null
+                && !prefs.getString("supabase_user_id", "").isEmpty()
+                && !prefs.getString("supabase_refresh_token", "").isEmpty();
+    }
+
+    private SupabaseSync.Session storedSupabaseSession(String url, String key) throws Exception {
+        String accessToken = prefs.getString("supabase_access_token", "");
+        String refreshToken = prefs.getString("supabase_refresh_token", "");
+        String userId = prefs.getString("supabase_user_id", "");
+        long expiresAt = prefs.getLong("supabase_expires_at", 0);
+        if (refreshToken.isEmpty() || userId.isEmpty()) {
+            throw new IllegalArgumentException("La sesión terminó. Inicia sesión nuevamente.");
+        }
+        SupabaseSync.Session session = new SupabaseSync.Session(accessToken, refreshToken, userId, expiresAt);
+        if (accessToken.isEmpty() || session.needsRefresh()) {
+            session = SupabaseSync.refreshSession(url, key, refreshToken);
+            saveSupabaseSession(session, prefs.getString("supabase_email", ""));
+        }
+        return session;
+    }
+
+    private void saveSupabaseSession(SupabaseSync.Session session, String email) {
+        prefs.edit()
+                .putString("supabase_access_token", session.accessToken)
+                .putString("supabase_refresh_token", session.refreshToken)
+                .putString("supabase_user_id", session.userId)
+                .putLong("supabase_expires_at", session.expiresAtEpochSeconds)
+                .putString("supabase_email", email)
+                .remove("supabase_last_error")
+                .apply();
+    }
+
+    private void clearSupabaseSession() {
+        prefs.edit()
+                .remove("supabase_access_token")
+                .remove("supabase_refresh_token")
+                .remove("supabase_user_id")
+                .remove("supabase_expires_at")
+                .remove("supabase_remote_updated_at")
+                .remove("supabase_last_error")
+                .putBoolean("supabase_pending_upload", false)
+                .apply();
+    }
+
+    private String lastSupabaseSyncLabel() {
+        long last = prefs.getLong("last_supabase_sync", 0);
+        if (last <= 0) return "Aún no se ha sincronizado";
+        return "Última actualización: "
+                + new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.US).format(new Date(last));
+    }
+
+    private void supabaseHelpDialog() {
+        Dialog dialog = new Dialog(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(bg);
+        root.setPadding(dp(16), dp(10), dp(16), dp(10));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.addView(iconButton(R.drawable.ic_action_back, v -> dialog.dismiss()), new LinearLayout.LayoutParams(dp(48), dp(48)));
+        TextView headerTitle = text("Cuenta y sincronización", 18, true, textColor);
+        headerTitle.setGravity(Gravity.CENTER);
+        header.addView(headerTitle, new LinearLayout.LayoutParams(0, dp(52), 1));
+        header.addView(new View(this), new LinearLayout.LayoutParams(dp(48), dp(48)));
+        root.addView(header);
+
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(0, dp(12), 0, dp(24));
+        body.addView(text("Configurar Supabase", 23, true, textColor));
+        body.addView(text("Sigue estos pasos una sola vez para activar la sincronización segura por cuenta.", 14, false, muted), margins(-1, -2, 0, 14));
+        body.addView(supabaseStep("1", "Crear el proyecto", "Abre Supabase, crea un proyecto llamado MoneyMate Modern, guarda la contraseña de la base de datos y elige la región más cercana."));
+        body.addView(iconActionWide("Abrir Supabase", R.drawable.ic_action_open, v -> openSupabaseDashboard()));
+        body.addView(supabaseStep("2", "Crear la tabla segura", "En SQL Editor pulsa New query, pega el script de configuración y selecciona Run."));
+        body.addView(iconSmallButton("Copiar script SQL", R.drawable.ic_action_copy, v -> copySupabaseSql()), new LinearLayout.LayoutParams(-1, dp(48)));
+        body.addView(supabaseStep("3", "Habilitar correo y contraseña", "En Authentication > Sign In / Providers abre Email y activa el proveedor. Para una prueba puedes desactivar Confirm email."));
+        body.addView(supabaseStep("4", "Copiar la conexión", "En Connect o Settings > API Keys copia Project URL y Publishable key. Nunca copies Secret key ni service_role."));
+        body.addView(supabaseStep("5", "Conectar tus dispositivos", "Regresa a la conexión, guarda la URL y la clave pública. Crea la cuenta una vez e inicia sesión con la misma cuenta en Android y web."));
+        TextView ready = text("La configuración es correcta cuando Authentication > Users muestra tu correo y la tabla money_snapshots contiene una fila después de la primera subida.", 13, true, incomeColor);
+        ready.setBackground(rounded(softIncome(), 14, 0, strokeColor));
+        ready.setPadding(dp(14), dp(12), dp(14), dp(12));
+        body.addView(ready, margins(-1, -2, 0, 12));
+        body.addView(iconSmallButton("Volver a la conexión", R.drawable.ic_action_back, v -> {
+            dialog.dismiss();
+            supabaseDialog();
+        }), new LinearLayout.LayoutParams(-1, dp(48)));
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(body);
+        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        dialog.setContentView(root);
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(rounded(bg, 0, 0, strokeColor));
+            window.setStatusBarColor(topSurface);
+            window.setNavigationBarColor(bg);
+            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        }
+    }
+
+    private View supabaseStep(String number, String title, String description) {
+        LinearLayout step = new LinearLayout(this);
+        step.setGravity(Gravity.TOP);
+        step.setPadding(dp(12), dp(12), dp(12), dp(12));
+        step.setBackground(rounded(surface2, 14, 0, strokeColor));
+        step.setLayoutParams(margins(-1, -2, 0, 8));
+        TextView badge = text(number, 15, true, Color.WHITE);
+        badge.setGravity(Gravity.CENTER);
+        badge.setBackground(rounded(transferColor, 12, 0, transferColor));
+        step.addView(badge, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        TextView copy = text(title + "\n" + description, 14, true, textColor);
+        copy.setPadding(dp(12), 0, 0, 0);
+        step.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        return step;
+    }
+
+    private void openSupabaseDashboard() {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(SupabaseSetup.DASHBOARD_URL)));
+        } catch (Exception ex) {
+            toast("No se pudo abrir el navegador.");
+        }
+    }
+
+    private void copySupabaseSql() {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (clipboard == null) {
+            toast("No se pudo acceder al portapapeles.");
+            return;
+        }
+        clipboard.setPrimaryClip(ClipData.newPlainText("MoneyMate Modern - Supabase SQL", SupabaseSetup.SQL));
+        toast("Script SQL copiado.");
     }
 
     private void monthDialog() {
@@ -1846,6 +2204,7 @@ public final class MainActivity extends Activity {
                     period = db.latestMonth();
                     statsAnchorDate = db.latestDate();
                     importInProgress = false;
+                    markLocalDataChanged();
                     toast("Importado: " + result.transactions + " movimientos");
                     if (content != null) draw();
                 });
@@ -2564,6 +2923,27 @@ public final class MainActivity extends Activity {
         b.setBackground(rounded(actionColor, 20, 0, actionColor));
         b.setLayoutParams(margins(-1, dp(52), 0, 8));
         return b;
+    }
+
+    private Button iconActionWide(String label, int drawableRes, View.OnClickListener listener) {
+        Button button = actionWide(label, listener);
+        setButtonIcon(button, drawableRes, Color.WHITE);
+        return button;
+    }
+
+    private Button iconSmallButton(String label, int drawableRes, View.OnClickListener listener) {
+        Button button = smallButton(label, listener);
+        setButtonIcon(button, drawableRes, actionColor);
+        return button;
+    }
+
+    private void setButtonIcon(Button button, int drawableRes, int color) {
+        Drawable icon = getResources().getDrawable(drawableRes).mutate();
+        icon.setTint(color);
+        icon.setBounds(0, 0, dp(19), dp(19));
+        button.setCompoundDrawables(icon, null, null, null);
+        button.setCompoundDrawablePadding(dp(7));
+        button.setGravity(Gravity.CENTER);
     }
 
     private void styleDialog(AlertDialog dialog) {

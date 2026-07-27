@@ -15,7 +15,9 @@ Aplicacion de finanzas personales sin anuncios para Android 10 o superior, acomp
 - Monedas por pais, incluido Sol peruano (`PEN`, `S/`).
 - Importacion y exportacion MMBAK, CSV, JSON y XLSX.
 - Reportes XLS y XLSX por semana, mes, año o todo.
-- Sincronizacion opcional Android/web con configuración de conexión separada del acceso de usuario.
+- Sincronizacion opcional Android/web con sesion persistente y renovación segura del acceso.
+- Sincronizacion automatica al modificar datos y comprobacion periodica de cambios en la nube.
+- Manual de Supabase integrado con el script SQL listo para copiar.
 - Deduplicacion de cuentas por nombre al importar y al actualizar bases existentes.
 
 ## Compatibilidad de datos

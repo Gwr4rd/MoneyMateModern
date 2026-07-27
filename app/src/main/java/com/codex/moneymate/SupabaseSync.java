@@ -19,54 +19,64 @@ final class SupabaseSync {
         JSONObject body = new JSONObject();
         body.put("email", email);
         body.put("password", password);
-        JSONObject response = request(
+        return parseSession(request(
                 normalizeUrl(projectUrl) + "/auth/v1/token?grant_type=password",
                 "POST",
                 publishableKey,
                 null,
                 body.toString(),
                 null
-        );
-        JSONObject user = response.optJSONObject("user");
-        String token = response.optString("access_token");
-        String userId = user == null ? "" : user.optString("id");
-        if (token.isEmpty() || userId.isEmpty()) throw new IllegalArgumentException("Supabase no devolvio una sesion valida.");
-        return new Session(token, userId);
+        ), false);
     }
 
     static Session signUp(String projectUrl, String publishableKey, String email, String password) throws Exception {
         JSONObject body = new JSONObject();
         body.put("email", email);
         body.put("password", password);
-        JSONObject response = request(
+        return parseSession(request(
                 normalizeUrl(projectUrl) + "/auth/v1/signup",
                 "POST",
                 publishableKey,
                 null,
                 body.toString(),
                 null
-        );
-        JSONObject user = response.optJSONObject("user");
-        String token = response.optString("access_token");
-        String userId = user == null ? "" : user.optString("id");
-        if (userId.isEmpty()) throw new IllegalArgumentException("Supabase no pudo crear la cuenta.");
-        return new Session(token, userId);
+        ), true);
     }
 
-    static void upload(String projectUrl, String publishableKey, Session session, JSONObject snapshot) throws Exception {
+    static Session refreshSession(String projectUrl, String publishableKey, String refreshToken) throws Exception {
+        if (refreshToken == null || refreshToken.trim().isEmpty()) {
+            throw new IllegalArgumentException("La sesion guardada no se puede renovar.");
+        }
+        JSONObject body = new JSONObject();
+        body.put("refresh_token", refreshToken);
+        return parseSession(request(
+                normalizeUrl(projectUrl) + "/auth/v1/token?grant_type=refresh_token",
+                "POST",
+                publishableKey,
+                null,
+                body.toString(),
+                null
+        ), false);
+    }
+
+    static String upload(String projectUrl, String publishableKey, Session session, JSONObject snapshot) throws Exception {
         JSONArray rows = new JSONArray();
         JSONObject row = new JSONObject();
         row.put("user_id", session.userId);
         row.put("data", snapshot);
         rows.put(row);
-        request(
-                normalizeUrl(projectUrl) + "/rest/v1/money_snapshots?on_conflict=user_id",
+        JSONObject response = request(
+                normalizeUrl(projectUrl) + "/rest/v1/money_snapshots?on_conflict=user_id&select=updated_at",
                 "POST",
                 publishableKey,
                 session.accessToken,
                 rows.toString(),
-                "resolution=merge-duplicates,return=minimal"
+                "resolution=merge-duplicates,return=representation"
         );
+        JSONArray resultRows = response.optJSONArray("rows");
+        return resultRows == null || resultRows.length() == 0
+                ? ""
+                : resultRows.getJSONObject(0).optString("updated_at");
     }
 
     static RemoteSnapshot download(String projectUrl, String publishableKey, Session session) throws Exception {
@@ -82,6 +92,26 @@ final class SupabaseSync {
         if (rows == null || rows.length() == 0) throw new IllegalArgumentException("Todavia no existe una copia en Supabase.");
         JSONObject row = rows.getJSONObject(0);
         return new RemoteSnapshot(row.getJSONObject("data"), row.optString("updated_at"));
+    }
+
+    private static Session parseSession(JSONObject response, boolean allowUnconfirmed) {
+        JSONObject user = response.optJSONObject("user");
+        String userId = user == null ? "" : user.optString("id");
+        String accessToken = response.optString("access_token");
+        String refreshToken = response.optString("refresh_token");
+        long expiresAt = response.optLong("expires_at", 0);
+        if (expiresAt <= 0 && response.optLong("expires_in", 0) > 0) {
+            expiresAt = System.currentTimeMillis() / 1000L + response.optLong("expires_in");
+        }
+        if (userId.isEmpty()) {
+            throw new IllegalArgumentException(allowUnconfirmed
+                    ? "Supabase no pudo crear la cuenta."
+                    : "Supabase no devolvio una sesion valida.");
+        }
+        if (!allowUnconfirmed && (accessToken.isEmpty() || refreshToken.isEmpty())) {
+            throw new IllegalArgumentException("Supabase no devolvio una sesion renovable.");
+        }
+        return new Session(accessToken, refreshToken, userId, expiresAt);
     }
 
     private static JSONObject request(String endpoint, String method, String apiKey, String accessToken, String body, String prefer) throws Exception {
@@ -141,11 +171,20 @@ final class SupabaseSync {
 
     static final class Session {
         final String accessToken;
+        final String refreshToken;
         final String userId;
+        final long expiresAtEpochSeconds;
 
-        Session(String accessToken, String userId) {
+        Session(String accessToken, String refreshToken, String userId, long expiresAtEpochSeconds) {
             this.accessToken = accessToken;
+            this.refreshToken = refreshToken;
             this.userId = userId;
+            this.expiresAtEpochSeconds = expiresAtEpochSeconds;
+        }
+
+        boolean needsRefresh() {
+            return expiresAtEpochSeconds <= 0
+                    || expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 90L;
         }
     }
 
