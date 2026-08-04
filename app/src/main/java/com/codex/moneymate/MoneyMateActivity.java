@@ -1094,12 +1094,12 @@ public class MoneyMateActivity extends Activity {
         TextView accountLabel = label("Cuenta");
         TextView toAccountLabel = label("Cuenta destino");
         TextView categoryLabel = label("Categoria");
+        form.addView(categoryLabel);
+        form.addView(category);
         form.addView(accountLabel);
         form.addView(account);
         form.addView(toAccountLabel);
         form.addView(toAccount);
-        form.addView(categoryLabel);
-        form.addView(category);
         form.addView(label("Nota"));
         form.addView(note);
         form.addView(label("Descripcion"));
@@ -1130,7 +1130,7 @@ public class MoneyMateActivity extends Activity {
         applyMovementType(0, typeButtons, accountLabel, toAccountLabel, toAccount, categoryLabel, category);
 
         if (copyFrom != null) {
-            int mode = copyFrom.isTransfer() ? 2 : ("income".equals(copyFrom.kind) ? 1 : 0);
+            int mode = MovementFormRules.positionFor(copyFrom.kind, copyFrom.isTransfer());
             type.setSelection(mode);
             applyMovementType(mode, typeButtons, accountLabel, toAccountLabel, toAccount, categoryLabel, category);
             if (mode != 2) {
@@ -1212,7 +1212,8 @@ public class MoneyMateActivity extends Activity {
         String t = time.getText().toString().trim();
         String n = note.getText().toString();
         String desc = description.getText().toString();
-        if (selected == 2) {
+        MovementFormRule rule = MovementFormRules.forPosition(selected);
+        if (rule.transfer) {
             String from = account.getSelectedItem().toString();
             String to = toAccount.getSelectedItem().toString();
             if (from.equals(to)) {
@@ -1230,7 +1231,7 @@ public class MoneyMateActivity extends Activity {
                 db.addTransfer(d, t, from, to, value, n, desc);
             }
         } else {
-            String kind = selected == 1 ? "income" : "expense";
+            String kind = rule.kind;
             if (editSource != null) {
                 if (editSource.isTransfer()) {
                     db.deleteMovement(editSource);
@@ -3179,16 +3180,15 @@ public class MoneyMateActivity extends Activity {
 
     private void applyMovementType(int position, Button[] buttons, TextView accountLabel, TextView toAccountLabel,
                                    Spinner toAccount, TextView categoryLabel, Spinner category) {
-        boolean transfer = position == 2;
-        accountLabel.setText(transfer ? "Cuenta origen" : "Cuenta");
-        toAccountLabel.setVisibility(transfer ? View.VISIBLE : View.GONE);
-        toAccount.setVisibility(transfer ? View.VISIBLE : View.GONE);
-        categoryLabel.setVisibility(transfer ? View.GONE : View.VISIBLE);
-        category.setVisibility(transfer ? View.GONE : View.VISIBLE);
+        MovementFormRule rule = MovementFormRules.forPosition(position);
+        accountLabel.setText(rule.accountLabel);
+        toAccountLabel.setVisibility(rule.showDestination ? View.VISIBLE : View.GONE);
+        toAccount.setVisibility(rule.showDestination ? View.VISIBLE : View.GONE);
+        categoryLabel.setVisibility(rule.showCategory ? View.VISIBLE : View.GONE);
+        category.setVisibility(rule.showCategory ? View.VISIBLE : View.GONE);
         styleMovementTypeButtons(buttons, position);
-        if (!transfer) {
-            String kind = position == 1 ? "income" : "expense";
-            category.setAdapter(stringAdapter(db.categories(kind)));
+        if (rule.showCategory) {
+            category.setAdapter(stringAdapter(db.categories(rule.kind)));
         }
     }
 

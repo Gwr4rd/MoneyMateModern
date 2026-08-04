@@ -1,16 +1,13 @@
-# MoneyMate Modern 1.4.0
+# MoneyMate Modern 1.4.1
 
 Aplicación de finanzas personales moderna, sin anuncios y compatible con Android 10 o superior.
 
 ## Cambios de esta versión
 
-- Nuevo autocompletado de notas en Android y web: al escribir se sugieren textos utilizados en movimientos anteriores.
-- Las sugerencias se ordenan por uso reciente, no distinguen mayúsculas y evitan notas duplicadas.
-- El formulario de movimientos usa un selector visible para `Ingreso`, `Gasto` y `Transferencia`, inspirado en el flujo de la aplicación de referencia.
-- Fecha y hora se presentan juntas y se eligen mediante controles nativos en Android.
-- Los gastos e ingresos muestran únicamente cuenta y categoría; las transferencias cambian automáticamente a cuenta origen y destino.
-- El formulario tiene mejor separación, jerarquía tipográfica y adaptación a pantallas móviles.
-- Al iniciar una transferencia se propone una cuenta destino distinta de la cuenta origen.
+- En ingresos y gastos, el formulario muestra ahora `Categoria` antes de `Cuenta` en Android y web.
+- Las transferencias conservan el orden natural `Cuenta origen` y `Cuenta destino`.
+- Las reglas de campos y tipos del formulario Android se migraron a Kotlin como parte de la modernizacion gradual.
+- Se mantienen el autocompletado de notas, los selectores nativos de fecha y hora y las funciones de edición y copia.
 
 ## Funciones incluidas
 
@@ -24,7 +21,7 @@ Aplicación de finanzas personales moderna, sin anuncios y compatible con Androi
 
 ## Instalación Android
 
-1. Descarga `MoneyMateModern-release-signed-v1.4.0.apk`.
+1. Descarga `MoneyMateModern-release-signed-v1.4.1.apk`.
 2. Permite la instalación desde el navegador o gestor de archivos.
 3. Abre el APK y confirma la instalación.
 

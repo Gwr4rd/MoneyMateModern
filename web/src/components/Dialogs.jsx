@@ -120,23 +120,32 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
           <label>Hora<input name="time" type="time" value={form.time} onChange={change} /></label>
         </div>
         <label>Importe<input name="amount" type="number" min="0.01" step="0.01" value={form.amount} onChange={change} autoFocus /></label>
-        <label>Cuenta
-          <select name="account" value={form.account} onChange={change}>
-            {availableAccounts.map((account) => <option key={account.name}>{account.name}</option>)}
-          </select>
-        </label>
         {form.kind === "transfer" ? (
-          <label>Cuenta destino
-            <select name="toAccount" value={form.toAccount} onChange={change}>
-              {availableAccounts.map((account) => <option key={account.name}>{account.name}</option>)}
-            </select>
-          </label>
+          <>
+            <label>Cuenta origen
+              <select name="account" value={form.account} onChange={change}>
+                {availableAccounts.map((account) => <option key={account.name}>{account.name}</option>)}
+              </select>
+            </label>
+            <label>Cuenta destino
+              <select name="toAccount" value={form.toAccount} onChange={change}>
+                {availableAccounts.map((account) => <option key={account.name}>{account.name}</option>)}
+              </select>
+            </label>
+          </>
         ) : (
-          <label>Categoria
-            <select name="category" value={form.category} onChange={change}>
-              {categories.map((category) => <option key={category.name}>{category.name}</option>)}
-            </select>
-          </label>
+          <>
+            <label>Categoria
+              <select name="category" value={form.category} onChange={change}>
+                {categories.map((category) => <option key={category.name}>{category.name}</option>)}
+              </select>
+            </label>
+            <label>Cuenta
+              <select name="account" value={form.account} onChange={change}>
+                {availableAccounts.map((account) => <option key={account.name}>{account.name}</option>)}
+              </select>
+            </label>
+          </>
         )}
         <label className="note-field">Nota
           <span className="note-autocomplete">

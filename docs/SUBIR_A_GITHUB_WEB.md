@@ -7,7 +7,7 @@ Este procedimiento no usa ZIP, Git por terminal ni archivos comprimidos.
 Usa solamente la carpeta preparada:
 
 ```text
-MoneyMateModern-GitHub-v1.4.0
+MoneyMateModern-GitHub-v1.4.1
 ```
 
 Esta carpeta excluye compilaciones, dependencias descargadas, configuraciones
@@ -29,7 +29,7 @@ ningun archivo se acerca al limite de 25 MiB de la carga web de GitHub.
 
 ## 2. Cargar los archivos sin comprimir
 
-1. Abre `MoneyMateModern-GitHub-v1.4.0` en el Explorador de Windows.
+1. Abre `MoneyMateModern-GitHub-v1.4.1` en el Explorador de Windows.
 2. Entra en la carpeta y presiona `Ctrl + A` para seleccionar todo su contenido.
 3. En el repositorio vacio de GitHub pulsa `uploading an existing file`.
 4. Si el repositorio ya muestra archivos, usa `Add file > Upload files`.
@@ -60,7 +60,7 @@ RELEASE_NOTES.md
 settings.gradle
 ```
 
-1. En `Commit message` escribe `Publicar MoneyMate Modern 1.4.0`.
+1. En `Commit message` escribe `Publicar MoneyMate Modern 1.4.1`.
 2. Selecciona `Commit directly to the main branch`.
 3. Pulsa `Commit changes`.
 4. Espera a que GitHub vuelva a la pagina principal del repositorio.
