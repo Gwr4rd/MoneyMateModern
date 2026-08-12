@@ -864,6 +864,26 @@ select:focus-visible {
   color: var(--text);
 }
 
+.movement-form .account-select {
+  padding-right: 34px;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.movement-form .account-select.is-active {
+  border-color: color-mix(in srgb, var(--green) 55%, var(--border));
+  background: var(--green-soft);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.movement-form .account-select.is-inactive {
+  border-color: var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-weight: 400;
+  opacity: 0.76;
+}
+
 .note-autocomplete {
   position: relative;
   display: block;

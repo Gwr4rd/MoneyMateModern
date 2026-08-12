@@ -1054,9 +1054,9 @@ public class MoneyMateActivity extends Activity {
         EditText amount = input("Importe");
         amount.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         if (copyFrom != null) amount.setText(String.format(Locale.US, "%.2f", copyFrom.amount));
-        boolean includeHiddenAccounts = showHiddenAccounts || copyFrom != null;
-        Spinner account = spinner(db.accounts(includeHiddenAccounts));
-        Spinner toAccount = spinner(db.accounts(includeHiddenAccounts));
+        List<AccountSelectionOption> accountChoices = movementAccountChoices();
+        Spinner account = accountSpinner(accountChoices);
+        Spinner toAccount = accountSpinner(accountChoices);
         if (copyFrom == null && toAccount.getCount() > 1) toAccount.setSelection(1);
         Spinner category = spinner(db.categories("expense"));
         AutoCompleteTextView note = noteInput(db.recentNotes());
@@ -3217,6 +3217,66 @@ public class MoneyMateActivity extends Activity {
         s.setPadding(dp(8), 0, dp(8), 0);
         s.setLayoutParams(margins(-1, dp(48), 0, 8));
         return s;
+    }
+
+    private List<AccountSelectionOption> movementAccountChoices() {
+        List<AccountSelectionOption> choices = new ArrayList<>();
+        for (MoneyDb.AccountTotal account : db.accountTotals()) {
+            choices.add(new AccountSelectionOption(
+                    account.name,
+                    AccountSelectionRules.isActive(account.balance, account.hidden)
+            ));
+        }
+        Collections.sort(choices, Comparator.comparingInt(choice -> choice.active ? 0 : 1));
+        return choices;
+    }
+
+    private Spinner accountSpinner(List<AccountSelectionOption> values) {
+        if (values.isEmpty()) values.add(new AccountSelectionOption("Sin cuentas", false));
+        Spinner spinner = new Spinner(this);
+        ArrayAdapter<AccountSelectionOption> adapter = new ArrayAdapter<AccountSelectionOption>(this, android.R.layout.simple_spinner_item, values) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                TextView item = (TextView) super.getView(position, convertView, parent);
+                styleAccountSpinnerText(item, getItem(position), false);
+                return item;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, ViewGroup parent) {
+                TextView item = (TextView) super.getDropDownView(position, convertView, parent);
+                styleAccountSpinnerText(item, getItem(position), true);
+                return item;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        spinner.setBackground(rounded(controlSurface(), 16, 1, strokeColor));
+        spinner.setPadding(dp(8), 0, dp(8), 0);
+        spinner.setLayoutParams(margins(-1, dp(48), 0, 8));
+        return spinner;
+    }
+
+    private void styleAccountSpinnerText(TextView item, AccountSelectionOption account, boolean dropdown) {
+        String status = account.active ? "Activa" : "Inactiva";
+        String value = account.name + "  ·  " + status;
+        SpannableString styled = new SpannableString(value);
+        int statusStart = value.length() - status.length();
+        styled.setSpan(new ForegroundColorSpan(account.active ? actionColor : muted), statusStart, value.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        styled.setSpan(new RelativeSizeSpan(0.86f), statusStart, value.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (account.active) {
+            styled.setSpan(new StyleSpan(Typeface.BOLD), 0, account.name.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        } else {
+            styled.setSpan(new ForegroundColorSpan(muted), 0, account.name.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        item.setText(styled);
+        item.setTextColor(account.active ? textColor : muted);
+        item.setTextSize(14);
+        item.setSingleLine(true);
+        item.setGravity(Gravity.CENTER_VERTICAL);
+        item.setPadding(dp(12), dropdown ? dp(13) : 0, dp(12), dropdown ? dp(13) : 0);
+        item.setAlpha(account.active ? 1f : 0.72f);
+        if (dropdown) item.setBackgroundColor(account.active ? actionSoft : surface);
     }
 
     private ArrayAdapter<String> stringAdapter(List<String> values) {

@@ -17,10 +17,42 @@ import {
 } from "lucide-react";
 import { getSupabaseConfig, isSupabaseConfigured, saveSupabaseConfig } from "../lib/supabase";
 import { SUPABASE_DASHBOARD_URL, SUPABASE_SQL } from "../lib/supabaseSetup";
-import { today } from "../lib/finance";
+import { accountBalances, today } from "../lib/finance";
+
+function AccountSelect({ label, name, value, accounts, onChange }) {
+  const selected = accounts.find((account) => account.name === value);
+  const activeAccounts = accounts.filter((account) => account.active);
+  const inactiveAccounts = accounts.filter((account) => !account.active);
+
+  const options = (items) => items.map((account) => (
+    <option value={account.name} key={account.name}>
+      {account.name} · {account.active ? "Activa" : "Inactiva"}
+    </option>
+  ));
+
+  return (
+    <label>{label}
+      <select
+        className={`account-select ${selected?.active ? "is-active" : "is-inactive"}`}
+        name={name}
+        value={value}
+        onChange={onChange}
+      >
+        {activeAccounts.length ? <optgroup label="Cuentas activas">{options(activeAccounts)}</optgroup> : null}
+        {inactiveAccounts.length ? <optgroup label="Cuentas inactivas">{options(inactiveAccounts)}</optgroup> : null}
+      </select>
+    </label>
+  );
+}
 
 export function MovementDialog({ data, initial = null, mode = "new", onClose, onSave }) {
-  const availableAccounts = data.accounts.filter((account) => !account.hidden);
+  const availableAccounts = useMemo(() => accountBalances(data)
+    .map((account, index) => ({
+      ...account,
+      active: !account.hidden && Math.abs(Number(account.currentBalance) || 0) >= 0.005,
+      originalIndex: index,
+    }))
+    .sort((left, right) => Number(right.active) - Number(left.active) || left.originalIndex - right.originalIndex), [data]);
   const defaultAccount = initial?.account || availableAccounts[0]?.name || "";
   const defaultToAccount = initial?.toAccount
     || availableAccounts.find((account) => account.name !== defaultAccount)?.name
@@ -122,16 +154,8 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
         <label>Importe<input name="amount" type="number" min="0.01" step="0.01" value={form.amount} onChange={change} autoFocus /></label>
         {form.kind === "transfer" ? (
           <>
-            <label>Cuenta origen
-              <select name="account" value={form.account} onChange={change}>
-                {availableAccounts.map((account) => <option key={account.name}>{account.name}</option>)}
-              </select>
-            </label>
-            <label>Cuenta destino
-              <select name="toAccount" value={form.toAccount} onChange={change}>
-                {availableAccounts.map((account) => <option key={account.name}>{account.name}</option>)}
-              </select>
-            </label>
+            <AccountSelect label="Cuenta origen" name="account" value={form.account} accounts={availableAccounts} onChange={change} />
+            <AccountSelect label="Cuenta destino" name="toAccount" value={form.toAccount} accounts={availableAccounts} onChange={change} />
           </>
         ) : (
           <>
@@ -140,11 +164,7 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
                 {categories.map((category) => <option key={category.name}>{category.name}</option>)}
               </select>
             </label>
-            <label>Cuenta
-              <select name="account" value={form.account} onChange={change}>
-                {availableAccounts.map((account) => <option key={account.name}>{account.name}</option>)}
-              </select>
-            </label>
+            <AccountSelect label="Cuenta" name="account" value={form.account} accounts={availableAccounts} onChange={change} />
           </>
         )}
         <label className="note-field">Nota
