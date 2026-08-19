@@ -58,6 +58,15 @@ const dictionaries = {
     "Cambios guardados automáticamente.": "Changes saved automatically.", "Cambios recientes recibidos desde Supabase.": "Recent changes received from Supabase.",
     "Cuenta conectada. La sesión permanecerá activa.": "Account connected. Your session will remain active.", "Copia subida correctamente.": "Copy uploaded successfully.",
     "Datos descargados correctamente.": "Data downloaded successfully.", "Cuenta creada y conectada. La sesión permanecerá activa.": "Account created and connected. Your session will remain active.",
+    Datos: "Data", "Datos y respaldos": "Data and backups", "Exportar respaldo JSON": "Export JSON backup",
+    "Importar respaldo JSON": "Import JSON backup", "Deshacer última importación": "Undo last import",
+    Movimientos: "Transactions", Transferencias: "Transfers", Categorias: "Categories", "Importar ahora": "Import now",
+    "El archivo JSON no es un respaldo válido.": "The JSON file is not a valid backup.",
+    "Al confirmar se reemplazarán los datos de este navegador y se guardará una copia para deshacer.": "Confirming will replace this browser's data and save a copy that can be restored.",
+    "Conflicto de sincronización": "Sync conflict", "Elige qué copia deseas conservar": "Choose which copy to keep",
+    "Usar copia de la nube": "Use cloud copy", "Conservar copia local": "Keep local copy",
+    "El archivo no contiene movimientos válidos.": "The file contains no valid transactions.",
+    "Se reemplazarán los datos actuales por la copia anterior a la última importación.": "Current data will be replaced by the copy saved before the last import.",
     "Cuenta creada. Revisa tu correo para confirmarla antes de iniciar sesion.": "Account created. Check your email to confirm it before signing in.",
     "Sesión cerrada en este navegador.": "Signed out in this browser.", "Cerrar dialogo": "Close dialog",
     "Los movimientos historicos conservaran su nombre.": "Historical transactions will keep its name.",
@@ -115,6 +124,15 @@ const dictionaries = {
     "Cambios guardados automáticamente.": "Alterações salvas automaticamente.", "Cambios recientes recibidos desde Supabase.": "Alterações recentes recebidas do Supabase.",
     "Cuenta conectada. La sesión permanecerá activa.": "Conta conectada. A sessão permanecerá ativa.", "Copia subida correctamente.": "Cópia enviada com sucesso.",
     "Datos descargados correctamente.": "Dados baixados com sucesso.", "Sesión cerrada en este navegador.": "Sessão encerrada neste navegador.",
+    Datos: "Dados", "Datos y respaldos": "Dados e backups", "Exportar respaldo JSON": "Exportar backup JSON",
+    "Importar respaldo JSON": "Importar backup JSON", "Deshacer última importación": "Desfazer última importação",
+    Movimientos: "Transações", Transferencias: "Transferências", Categorias: "Categorias", "Importar ahora": "Importar agora",
+    "El archivo JSON no es un respaldo válido.": "O arquivo JSON não é um backup válido.",
+    "Al confirmar se reemplazarán los datos de este navegador y se guardará una copia para deshacer.": "Ao confirmar, os dados deste navegador serão substituídos e uma cópia será salva para desfazer.",
+    "Conflicto de sincronización": "Conflito de sincronização", "Elige qué copia deseas conservar": "Escolha qual cópia deseja manter",
+    "Usar copia de la nube": "Usar cópia da nuvem", "Conservar copia local": "Manter cópia local",
+    "El archivo no contiene movimientos válidos.": "O arquivo não contém transações válidas.",
+    "Se reemplazarán los datos actuales por la copia anterior a la última importación.": "Os dados atuais serão substituídos pela cópia salva antes da última importação.",
     "Abre Supabase, crea un proyecto llamado Control Financiero, guarda la contrasena de la base de datos y elige la region mas cercana.": "Abra o Supabase, crie um projeto chamado Control Financiero, salve a senha do banco de dados e escolha a região mais próxima.",
     "En SQL Editor pulsa New query, pega el script de configuracion y selecciona Run.": "No SQL Editor, selecione New query, cole o script de configuração e escolha Run.",
     "En Authentication > Sign In / Providers abre Email y activa el proveedor. Para una prueba puedes desactivar Confirm email.": "Em Authentication > Sign In / Providers, abra Email e ative o provedor. Para testes, você pode desativar Confirm email.",
@@ -181,6 +199,15 @@ const dictionaries = {
     "Cambios guardados automáticamente.": "Modifications enregistrées automatiquement.", "Cambios recientes recibidos desde Supabase.": "Modifications récentes reçues de Supabase.",
     "Cuenta conectada. La sesión permanecerá activa.": "Compte connecté. La session restera active.", "Copia subida correctamente.": "Copie envoyée avec succès.",
     "Datos descargados correctamente.": "Données téléchargées avec succès.", "Sesión cerrada en este navegador.": "Session fermée dans ce navigateur.",
+    Datos: "Données", "Datos y respaldos": "Données et sauvegardes", "Exportar respaldo JSON": "Exporter la sauvegarde JSON",
+    "Importar respaldo JSON": "Importer une sauvegarde JSON", "Deshacer última importación": "Annuler la dernière importation",
+    Movimientos: "Transactions", Transferencias: "Virements", Categorias: "Catégories", "Importar ahora": "Importer maintenant",
+    "El archivo JSON no es un respaldo válido.": "Le fichier JSON n'est pas une sauvegarde valide.",
+    "Al confirmar se reemplazarán los datos de este navegador y se guardará una copia para deshacer.": "La confirmation remplacera les données de ce navigateur et conservera une copie restaurable.",
+    "Conflicto de sincronización": "Conflit de synchronisation", "Elige qué copia deseas conservar": "Choisissez la copie à conserver",
+    "Usar copia de la nube": "Utiliser la copie cloud", "Conservar copia local": "Conserver la copie locale",
+    "El archivo no contiene movimientos válidos.": "Le fichier ne contient aucune transaction valide.",
+    "Se reemplazarán los datos actuales por la copia anterior a la última importación.": "Les données actuelles seront remplacées par la copie enregistrée avant la dernière importation.",
     "Abre Supabase, crea un proyecto llamado Control Financiero, guarda la contrasena de la base de datos y elige la region mas cercana.": "Ouvrez Supabase, créez un projet nommé Control Financiero, conservez le mot de passe de la base et choisissez la région la plus proche.",
     "En SQL Editor pulsa New query, pega el script de configuracion y selecciona Run.": "Dans SQL Editor, sélectionnez New query, collez le script de configuration et choisissez Run.",
     "En Authentication > Sign In / Providers abre Email y activa el proveedor. Para una prueba puedes desactivar Confirm email.": "Dans Authentication > Sign In / Providers, ouvrez Email et activez le fournisseur. Pour tester, vous pouvez désactiver Confirm email.",
@@ -206,6 +233,24 @@ function translateLine(value, language) {
   const dictionary = dictionaries[language];
   if (!dictionary) return value;
   if (dictionary[value]) return dictionary[value];
+  const duplicatesMatch = value.match(/^Se omitieron (\d+) movimientos duplicados\.$/);
+  if (duplicatesMatch) {
+    const templates = {
+      en: `${duplicatesMatch[1]} duplicate transactions were skipped.`,
+      pt: `${duplicatesMatch[1]} transações duplicadas foram ignoradas.`,
+      fr: `${duplicatesMatch[1]} transactions en double ont été ignorées.`,
+    };
+    return templates[language] || value;
+  }
+  const existingMatch = value.match(/^(\d+) movimientos también existen en los datos actuales\.$/);
+  if (existingMatch) {
+    const templates = {
+      en: `${existingMatch[1]} transactions also exist in the current data.`,
+      pt: `${existingMatch[1]} transações também existem nos dados atuais.`,
+      fr: `${existingMatch[1]} transactions existent aussi dans les données actuelles.`,
+    };
+    return templates[language] || value;
+  }
   const visibleMatch = value.match(/^(\d+) visibles$/);
   if (visibleMatch) return `${visibleMatch[1]} ${dictionary.visibles || "visibles"}`;
   const hiddenMatch = value.match(/^Mostrar cuentas ocultas \((\d+)\)$/);

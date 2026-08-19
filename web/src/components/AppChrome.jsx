@@ -2,6 +2,7 @@ import {
   Banknote,
   BarChart3,
   CloudMoon,
+  DatabaseBackup,
   FileSpreadsheet,
   ListTree,
   Languages,
@@ -21,7 +22,7 @@ const navItems = [
   { id: "accounts", label: "Cuentas", icon: WalletCards },
 ];
 
-export function Header({ active, dark, language, onNav, onTheme, onCurrency, onSearch, onNew, onReport, onSync, onLanguage, onAbout }) {
+export function Header({ active, dark, language, onNav, onTheme, onCurrency, onSearch, onNew, onReport, onData, onSync, onLanguage, onAbout }) {
   const mobileAction = (action) => (event) => {
     event.currentTarget.closest("details")?.removeAttribute("open");
     action();
@@ -44,6 +45,7 @@ export function Header({ active, dark, language, onNav, onTheme, onCurrency, onS
           <span>{t("Nuevo movimiento", language)}</span>
         </button>
         <IconAction className="desktop-action" icon={FileSpreadsheet} label={t("Reporte", language)} onClick={onReport} />
+        <IconAction className="desktop-action" icon={DatabaseBackup} label={t("Datos", language)} onClick={onData} />
         <IconAction className="desktop-action" icon={RefreshCw} label={t("Sincronizar", language)} onClick={onSync} />
         <IconAction className="desktop-action" icon={Banknote} label={t("Moneda", language)} onClick={onCurrency} />
         <IconAction className="desktop-action" icon={Languages} label={t("Idioma", language)} onClick={onLanguage} />
@@ -58,6 +60,7 @@ export function Header({ active, dark, language, onNav, onTheme, onCurrency, onS
             <button onClick={mobileAction(onCurrency)}><Banknote size={20} /> {t("Moneda y pais", language)}</button>
             <button onClick={mobileAction(onLanguage)}><Languages size={20} /> {t("Idioma", language)}</button>
             <button onClick={mobileAction(onReport)}><FileSpreadsheet size={20} /> {t("Generar reporte", language)}</button>
+            <button onClick={mobileAction(onData)}><DatabaseBackup size={20} /> {t("Datos y respaldos", language)}</button>
             <button onClick={mobileAction(onSync)}><RefreshCw size={20} /> {t("Sincronizar", language)}</button>
             <button onClick={mobileAction(onAbout)}><Info size={20} /> {t("Acerca de", language)}</button>
           </div>

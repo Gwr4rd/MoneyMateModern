@@ -1,6 +1,7 @@
 const CONFIG_KEY = "moneymate-supabase-config";
 export const SYNC_PENDING_KEY = "moneymate-supabase-pending";
 export const SYNC_REMOTE_KEY = "moneymate-supabase-remote-updated-at";
+export const SYNC_CONFLICT_KEY = "moneymate-supabase-conflict";
 
 let clientPromise;
 let clientSignature = "";
@@ -31,6 +32,7 @@ export function saveSupabaseConfig(urlValue, keyValue) {
     clientSignature = "";
     localStorage.removeItem(SYNC_REMOTE_KEY);
     localStorage.removeItem(SYNC_PENDING_KEY);
+    localStorage.removeItem(SYNC_CONFLICT_KEY);
   }
   return { url, key, source: "local", changed };
 }
@@ -85,6 +87,7 @@ export async function signOut() {
   if (error) throw error;
   localStorage.removeItem(SYNC_PENDING_KEY);
   localStorage.removeItem(SYNC_REMOTE_KEY);
+  localStorage.removeItem(SYNC_CONFLICT_KEY);
 }
 
 async function requireSession() {

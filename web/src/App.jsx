@@ -5,6 +5,7 @@ import { AccountsPanel } from "./components/AccountsPanel";
 import {
   AccountDialog,
   AboutDialog,
+  BackupDialog,
   CurrencyDialog,
   MetadataDialog,
   LanguageDialog,
@@ -28,12 +29,14 @@ import {
   summary,
   today,
 } from "./lib/finance";
+import { IMPORT_UNDO_KEY, normalizeSnapshot } from "./lib/backup";
 import {
   createAccount,
   downloadSnapshot,
   getCurrentUser,
   signIn,
   signOut,
+  SYNC_CONFLICT_KEY,
   SYNC_PENDING_KEY,
   SYNC_REMOTE_KEY,
   uploadSnapshot,
@@ -53,6 +56,7 @@ export default function App() {
   const [syncMessage, setSyncMessage] = useState("");
   const [syncUser, setSyncUser] = useState(null);
   const [syncRevision, setSyncRevision] = useState(0);
+  const [syncConflict, setSyncConflict] = useState(() => localStorage.getItem(SYNC_CONFLICT_KEY) === "1");
   const searchRef = useRef(null);
   const syncTimerRef = useRef(null);
   const syncOperationRef = useRef(false);
@@ -97,9 +101,17 @@ export default function App() {
       }
       syncOperationRef.current = true;
       try {
+        if (await hasRemoteSyncConflict()) {
+          localStorage.setItem(SYNC_CONFLICT_KEY, "1");
+          setSyncConflict(true);
+          setSyncMessage("Hay cambios locales y en la nube. Abre Sincronización y elige qué copia conservar.");
+          return;
+        }
         const result = await uploadSnapshot(data);
         if (result?.updated_at) localStorage.setItem(SYNC_REMOTE_KEY, result.updated_at);
         localStorage.removeItem(SYNC_PENDING_KEY);
+        localStorage.removeItem(SYNC_CONFLICT_KEY);
+        setSyncConflict(false);
         setSyncMessage("Cambios guardados automáticamente.");
       } catch (error) {
         localStorage.setItem(SYNC_PENDING_KEY, "1");
@@ -127,7 +139,7 @@ export default function App() {
         if (!previous) {
           localStorage.setItem(SYNC_REMOTE_KEY, remote.updated_at || "");
         } else if (remote.updated_at && remote.updated_at !== previous) {
-          setData(normalizeSnapshot(remote.data));
+          setData(normalizeSnapshot(remote.data).data);
           localStorage.setItem(SYNC_REMOTE_KEY, remote.updated_at);
           setSyncMessage("Cambios recientes recibidos desde Supabase.");
         }
@@ -171,6 +183,17 @@ export default function App() {
     setData(update);
     setSyncRevision((value) => value + 1);
     if (closeDialog) setDialog(null);
+  }
+
+  async function hasRemoteSyncConflict() {
+    try {
+      const remote = await downloadSnapshot();
+      const previous = localStorage.getItem(SYNC_REMOTE_KEY) || "";
+      return Boolean(remote.updated_at && (!previous || remote.updated_at !== previous));
+    } catch (error) {
+      if (String(error.message).includes("Todavia no existe")) return false;
+      throw error;
+    }
   }
 
   function saveMovement(transaction) {
@@ -320,6 +343,8 @@ export default function App() {
       const result = await uploadSnapshot(data);
       if (result?.updated_at) localStorage.setItem(SYNC_REMOTE_KEY, result.updated_at);
       localStorage.removeItem(SYNC_PENDING_KEY);
+      localStorage.removeItem(SYNC_CONFLICT_KEY);
+      setSyncConflict(false);
       setSyncMessage("Copia subida correctamente.");
     } catch (error) {
       localStorage.setItem(SYNC_PENDING_KEY, "1");
@@ -337,9 +362,11 @@ export default function App() {
     syncOperationRef.current = true;
     try {
       const remote = await downloadSnapshot();
-      setData(normalizeSnapshot(remote.data));
+      setData(normalizeSnapshot(remote.data).data);
       if (remote.updated_at) localStorage.setItem(SYNC_REMOTE_KEY, remote.updated_at);
       localStorage.removeItem(SYNC_PENDING_KEY);
+      localStorage.removeItem(SYNC_CONFLICT_KEY);
+      setSyncConflict(false);
       setSyncMessage("Datos descargados correctamente.");
     } catch (error) {
       setSyncMessage(error.message);
@@ -373,6 +400,7 @@ export default function App() {
     try {
       await signOut();
       setSyncUser(null);
+      setSyncConflict(false);
       setSyncMessage("Sesión cerrada en este navegador.");
     } catch (error) {
       setSyncMessage(error.message);
@@ -383,6 +411,7 @@ export default function App() {
   }
 
   async function syncConfigSaved() {
+    setSyncConflict(localStorage.getItem(SYNC_CONFLICT_KEY) === "1");
     try {
       setSyncUser(await getCurrentUser());
     } catch {
@@ -414,6 +443,36 @@ export default function App() {
     XLSX.writeFile(workbook, `moneymate_estado_${reportScope}_${anchor}.xlsx`);
   }
 
+  function exportBackup() {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `control-financiero-${today()}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
+  function applyBackupImport(nextData) {
+    localStorage.setItem(IMPORT_UNDO_KEY, JSON.stringify(data));
+    commitData(nextData);
+    const anchor = latestDate(nextData.transactions);
+    setFilters((current) => ({ ...current, anchor, account: "", query: "" }));
+  }
+
+  function undoBackupImport() {
+    if (!window.confirm(t("Se reemplazarán los datos actuales por la copia anterior a la última importación.", language))) return;
+    try {
+      const previous = JSON.parse(localStorage.getItem(IMPORT_UNDO_KEY));
+      if (!previous) return;
+      const restored = normalizeSnapshot(previous).data;
+      localStorage.removeItem(IMPORT_UNDO_KEY);
+      commitData(restored);
+      setFilters((current) => ({ ...current, anchor: latestDate(restored.transactions), account: "", query: "" }));
+    } catch {
+      localStorage.removeItem(IMPORT_UNDO_KEY);
+    }
+  }
+
   return (
     <div className="app-shell">
       <Header
@@ -426,6 +485,7 @@ export default function App() {
         onSearch={openSearch}
         onNew={() => setDialog("movement")}
         onReport={() => setDialog("report")}
+        onData={() => setDialog("backup")}
         onSync={() => { setSyncMessage(""); setDialog("sync"); }}
         onLanguage={() => setDialog("language")}
         onAbout={() => setDialog("about")}
@@ -553,10 +613,22 @@ export default function App() {
           user={syncUser}
           busy={syncBusy}
           message={syncMessage}
+          conflict={syncConflict}
           language={language}
         />
       ) : null}
       {dialog === "report" ? <ReportDialog onClose={() => setDialog(null)} onExport={exportReport} language={language} /> : null}
+      {dialog === "backup" ? (
+        <BackupDialog
+          data={data}
+          canUndo={Boolean(localStorage.getItem(IMPORT_UNDO_KEY))}
+          onClose={() => setDialog(null)}
+          onExport={exportBackup}
+          onApply={applyBackupImport}
+          onUndo={undoBackupImport}
+          language={language}
+        />
+      ) : null}
     </div>
   );
 }
@@ -564,49 +636,10 @@ export default function App() {
 function loadData() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    return saved?.version === 2 ? normalizeSnapshot(saved) : seedData;
+    return saved?.version === 2 ? normalizeSnapshot(saved).data : seedData;
   } catch {
     return seedData;
   }
-}
-
-function normalizeSnapshot(snapshot) {
-  const accounts = (Array.isArray(snapshot.accounts) ? snapshot.accounts : []).map((account) => ({
-    name: account.name || "Cuenta",
-    currency: account.currency || snapshot.currency || "PEN",
-    type: account.type?.trim() || "Cuentas de Banco",
-    balance: Number(account.balance) || 0,
-    description: account.description || "",
-    includeTotal: account.includeTotal !== false,
-    hidden: Boolean(account.hidden),
-  }));
-  const accountTypes = [...new Set([
-    "Efectivo",
-    "Cuentas de Banco",
-    ...(Array.isArray(snapshot.accountTypes) ? snapshot.accountTypes : []),
-    ...accounts.map((account) => account.type),
-  ].filter(Boolean))];
-  return {
-    version: 2,
-    currency: snapshot.currency || "PEN",
-    accountTypes,
-    accounts,
-    categories: Array.isArray(snapshot.categories) ? snapshot.categories : [],
-    transactions: (Array.isArray(snapshot.transactions) ? snapshot.transactions : [])
-      .map((transaction) => ({
-        id: transaction.id || crypto.randomUUID(),
-        date: transaction.date || today(),
-        time: transaction.time || "00:00",
-        kind: transaction.kind || "expense",
-        account: transaction.account || "Cuenta",
-        toAccount: transaction.toAccount || "",
-        category: transaction.category || "Sin categoria",
-        amount: Number(transaction.amount) || 0,
-        note: transaction.note || "",
-        description: transaction.description || "",
-      }))
-      .sort(sortTransactions),
-  };
 }
 
 function sortTransactions(left, right) {

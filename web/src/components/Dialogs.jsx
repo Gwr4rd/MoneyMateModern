@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
+  AlertTriangle,
   BookOpen,
   CheckCircle2,
   CloudDownload,
@@ -13,6 +14,7 @@ import {
   ListPlus,
   LogIn,
   LogOut,
+  RotateCcw,
   Save,
   Trash2,
   UserPlus,
@@ -20,7 +22,8 @@ import {
 } from "lucide-react";
 import { getSupabaseConfig, isSupabaseConfigured, saveSupabaseConfig } from "../lib/supabase";
 import { SUPABASE_DASHBOARD_URL, SUPABASE_SQL } from "../lib/supabaseSetup";
-import { accountBalances, today } from "../lib/finance";
+import { accountBalances, currency, today } from "../lib/finance";
+import { prepareBackupImport } from "../lib/backup";
 import { t } from "../i18n";
 
 function AccountSelect({ label, name, value, accounts, onChange, language }) {
@@ -418,6 +421,7 @@ export function SyncDialog({
   user,
   busy,
   message,
+  conflict,
   language,
 }) {
   const initialConfig = getSupabaseConfig();
@@ -523,16 +527,16 @@ export function SyncDialog({
         ) : null}
         {stage === "connected" ? (
           <>
-            <div className="sync-status connected">
-              <CheckCircle2 size={21} />
-              <span><strong>{t("Cuenta conectada", language)}</strong><small>{user?.email}</small><small>{t("Sesion activa y sincronizacion automatica", language)}</small></span>
+            <div className={`sync-status connected ${conflict ? "conflict" : ""}`}>
+              {conflict ? <AlertTriangle size={21} /> : <CheckCircle2 size={21} />}
+              <span><strong>{t(conflict ? "Conflicto de sincronización" : "Cuenta conectada", language)}</strong><small>{user?.email}</small><small>{t(conflict ? "Elige qué copia deseas conservar" : "Sesion activa y sincronizacion automatica", language)}</small></span>
             </div>
             <div className="dialog-actions">
               <button disabled={busy} onClick={onDownload}>
-                <CloudDownload size={19} /> {t("Descargar", language)}
+                <CloudDownload size={19} /> {t(conflict ? "Usar copia de la nube" : "Descargar", language)}
               </button>
               <button className="dialog-primary" disabled={busy} onClick={onUpload}>
-                <CloudUpload size={19} /> {t("Subir ahora", language)}
+                <CloudUpload size={19} /> {t(conflict ? "Conservar copia local" : "Subir ahora", language)}
               </button>
             </div>
             <button className="sync-guide-button" onClick={() => setStage("help")}>
@@ -550,6 +554,60 @@ export function SyncDialog({
       </div>
     </Modal>
   );
+}
+
+export function BackupDialog({ data, canUndo, onClose, onExport, onApply, onUndo, language }) {
+  const [preview, setPreview] = useState(null);
+  const [error, setError] = useState("");
+
+  async function readBackup(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setError("");
+    setPreview(null);
+    try {
+      const raw = JSON.parse(await file.text());
+      setPreview(prepareBackupImport(raw, data, file.name));
+    } catch {
+      setError(t("El archivo JSON no es un respaldo válido.", language));
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  return (
+    <Modal title={t("Datos y respaldos", language)} onClose={onClose} language={language}>
+      <div className="backup-dialog">
+        <div className="backup-actions">
+          <button onClick={onExport}><CloudDownload size={20} /><span>{t("Exportar respaldo JSON", language)}</span></button>
+          <label><CloudUpload size={20} /><span>{t("Importar respaldo JSON", language)}</span><input type="file" accept="application/json,.json" onChange={readBackup} /></label>
+          {canUndo ? <button onClick={onUndo}><RotateCcw size={20} /><span>{t("Deshacer última importación", language)}</span></button> : null}
+        </div>
+        {error ? <p className="dialog-message">{error}</p> : null}
+        {preview ? (
+          <div className="backup-preview">
+            <strong>{preview.fileName}</strong>
+            <div className="backup-preview-grid">
+              <PreviewValue label={t("Movimientos", language)} value={preview.movements} />
+              <PreviewValue label={t("Transferencias", language)} value={preview.transfers} />
+              <PreviewValue label={t("Cuentas", language)} value={preview.accounts} />
+              <PreviewValue label={t("Categorias", language)} value={preview.categories} />
+              <PreviewValue label={t("Ingresos", language)} value={currency(preview.income, preview.data.currency)} />
+              <PreviewValue label={t("Gastos", language)} value={currency(preview.expense, preview.data.currency)} />
+            </div>
+            {preview.firstDate ? <p>{t("Periodo", language)}: <strong>{preview.firstDate} → {preview.lastDate}</strong></p> : null}
+            {preview.warnings.map((warning) => <p className="backup-warning" key={warning}>{t(warning, language)}</p>)}
+            <p className="dialog-message">{t("Al confirmar se reemplazarán los datos de este navegador y se guardará una copia para deshacer.", language)}</p>
+            <button className="dialog-primary" onClick={() => onApply(preview.data)}><CloudUpload size={19} /> {t("Importar ahora", language)}</button>
+          </div>
+        ) : null}
+      </div>
+    </Modal>
+  );
+}
+
+function PreviewValue({ label, value }) {
+  return <div><span>{label}</span><strong>{value}</strong></div>;
 }
 
 function SupabaseGuide({ onBack, onCopy, language }) {

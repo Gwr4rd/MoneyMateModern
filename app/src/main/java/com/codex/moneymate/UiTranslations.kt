@@ -136,7 +136,24 @@ object UiTranslations {
         "Semanal, mensual, anual o todo" to "Weekly, monthly, yearly, or all",
         "Subir o descargar desde Supabase" to "Upload to or download from Supabase",
         "MMBAK, CSV, JSON o XLSX" to "MMBAK, CSV, JSON, or XLSX", "Balance total" to "Total balance",
-        "Depositos" to "Deposits", "Retiros" to "Withdrawals", "Saldo" to "Balance"
+        "Depositos" to "Deposits", "Retiros" to "Withdrawals", "Saldo" to "Balance",
+        "Revisar integridad" to "Check data integrity", "Deshacer última importación" to "Undo last import",
+        "Datos en buen estado" to "Data is healthy", "Se encontraron observaciones" to "Issues found",
+        "Base de datos" to "Database", "Correcta" to "Healthy", "Requiere atención" to "Needs attention",
+        "Movimientos duplicados" to "Duplicate transactions", "Movimientos sin cuenta" to "Transactions without an account",
+        "Fechas o importes inválidos" to "Invalid dates or amounts", "Transferencias incompletas" to "Incomplete transfers",
+        "Integridad de los datos" to "Data integrity", "Reparar problemas seguros" to "Repair safe issues",
+        "Conflicto pendiente: elige qué copia conservar" to "Sync conflict: choose which copy to keep",
+        "Conservar copia local y subir" to "Keep local copy and upload", "Usar copia de la nube" to "Use cloud copy",
+        "Ya hay una importación en curso." to "An import is already running.", "Analizando archivo..." to "Analyzing file...",
+        "Vista previa de importación" to "Import preview", "Movimientos" to "Transactions", "Transferencias" to "Transfers",
+        "Categorías" to "Categories", "Duplicados omitidos" to "Duplicates skipped", "Importar ahora" to "Import now",
+        "Al confirmar se reemplazarán los datos locales. Se guardará una copia para poder deshacer la importación." to "Confirming will replace local data and save a copy that can undo the import.",
+        "Importando datos..." to "Importing data...", "Restaurar" to "Restore", "Importación deshecha." to "Import undone.",
+        "Se restaurarán las cuentas, categorías y movimientos que existían antes de la última importación." to "Accounts, categories, and transactions from before the last import will be restored.",
+        "No se pudo restaurar" to "Restore failed", "No existe una copia de recuperación." to "No recovery copy exists.",
+        "No se pudo preparar la base de datos." to "The database could not be prepared.",
+        "Hay cambios locales y en la nube. Abre Sincronización y elige qué copia conservar." to "There are local and cloud changes. Open Sync and choose which copy to keep."
     )
 
     private val portuguese = translations(
@@ -261,7 +278,24 @@ object UiTranslations {
         "Semanal, mensual, anual o todo" to "Semanal, mensal, anual ou tudo",
         "Subir o descargar desde Supabase" to "Enviar para ou baixar do Supabase",
         "MMBAK, CSV, JSON o XLSX" to "MMBAK, CSV, JSON ou XLSX", "Balance total" to "Saldo total",
-        "Depositos" to "Depósitos", "Retiros" to "Saques", "Saldo" to "Saldo"
+        "Depositos" to "Depósitos", "Retiros" to "Saques", "Saldo" to "Saldo",
+        "Revisar integridad" to "Verificar integridade", "Deshacer última importación" to "Desfazer última importação",
+        "Datos en buen estado" to "Os dados estão íntegros", "Se encontraron observaciones" to "Foram encontrados problemas",
+        "Base de datos" to "Banco de dados", "Correcta" to "Íntegro", "Requiere atención" to "Requer atenção",
+        "Movimientos duplicados" to "Transações duplicadas", "Movimientos sin cuenta" to "Transações sem conta",
+        "Fechas o importes inválidos" to "Datas ou valores inválidos", "Transferencias incompletas" to "Transferências incompletas",
+        "Integridad de los datos" to "Integridade dos dados", "Reparar problemas seguros" to "Corrigir problemas seguros",
+        "Conflicto pendiente: elige qué copia conservar" to "Conflito pendente: escolha qual cópia manter",
+        "Conservar copia local y subir" to "Manter cópia local e enviar", "Usar copia de la nube" to "Usar cópia da nuvem",
+        "Ya hay una importación en curso." to "Já existe uma importação em andamento.", "Analizando archivo..." to "Analisando arquivo...",
+        "Vista previa de importación" to "Prévia da importação", "Movimientos" to "Transações", "Transferencias" to "Transferências",
+        "Categorías" to "Categorias", "Duplicados omitidos" to "Duplicados ignorados", "Importar ahora" to "Importar agora",
+        "Al confirmar se reemplazarán los datos locales. Se guardará una copia para poder deshacer la importación." to "Ao confirmar, os dados locais serão substituídos e uma cópia será salva para desfazer a importação.",
+        "Importando datos..." to "Importando dados...", "Restaurar" to "Restaurar", "Importación deshecha." to "Importação desfeita.",
+        "Se restaurarán las cuentas, categorías y movimientos que existían antes de la última importación." to "As contas, categorias e transações anteriores à última importação serão restauradas.",
+        "No se pudo restaurar" to "Não foi possível restaurar", "No existe una copia de recuperación." to "Não existe uma cópia de recuperação.",
+        "No se pudo preparar la base de datos." to "Não foi possível preparar o banco de dados.",
+        "Hay cambios locales y en la nube. Abre Sincronización y elige qué copia conservar." to "Há alterações locais e na nuvem. Abra Sincronização e escolha qual cópia manter."
     )
 
     private val french = translations(
@@ -385,7 +419,24 @@ object UiTranslations {
         "Semanal, mensual, anual o todo" to "Hebdomadaire, mensuel, annuel ou tout",
         "Subir o descargar desde Supabase" to "Envoyer vers ou télécharger depuis Supabase",
         "MMBAK, CSV, JSON o XLSX" to "MMBAK, CSV, JSON ou XLSX", "Balance total" to "Solde total",
-        "Depositos" to "Dépôts", "Retiros" to "Retraits", "Saldo" to "Solde"
+        "Depositos" to "Dépôts", "Retiros" to "Retraits", "Saldo" to "Solde",
+        "Revisar integridad" to "Vérifier l'intégrité", "Deshacer última importación" to "Annuler la dernière importation",
+        "Datos en buen estado" to "Les données sont intègres", "Se encontraron observaciones" to "Des problèmes ont été détectés",
+        "Base de datos" to "Base de données", "Correcta" to "Intègre", "Requiere atención" to "Nécessite une attention",
+        "Movimientos duplicados" to "Transactions en double", "Movimientos sin cuenta" to "Transactions sans compte",
+        "Fechas o importes inválidos" to "Dates ou montants invalides", "Transferencias incompletas" to "Virements incomplets",
+        "Integridad de los datos" to "Intégrité des données", "Reparar problemas seguros" to "Corriger les problèmes sûrs",
+        "Conflicto pendiente: elige qué copia conservar" to "Conflit en attente : choisissez la copie à conserver",
+        "Conservar copia local y subir" to "Conserver la copie locale et l'envoyer", "Usar copia de la nube" to "Utiliser la copie cloud",
+        "Ya hay una importación en curso." to "Une importation est déjà en cours.", "Analizando archivo..." to "Analyse du fichier...",
+        "Vista previa de importación" to "Aperçu de l'importation", "Movimientos" to "Transactions", "Transferencias" to "Virements",
+        "Categorías" to "Catégories", "Duplicados omitidos" to "Doublons ignorés", "Importar ahora" to "Importer maintenant",
+        "Al confirmar se reemplazarán los datos locales. Se guardará una copia para poder deshacer la importación." to "La confirmation remplacera les données locales et conservera une copie permettant d'annuler l'importation.",
+        "Importando datos..." to "Importation des données...", "Restaurar" to "Restaurer", "Importación deshecha." to "Importation annulée.",
+        "Se restaurarán las cuentas, categorías y movimientos que existían antes de la última importación." to "Les comptes, catégories et transactions antérieurs à la dernière importation seront restaurés.",
+        "No se pudo restaurar" to "Échec de la restauration", "No existe una copia de recuperación." to "Aucune copie de récupération n'existe.",
+        "No se pudo preparar la base de datos." to "La base de données n'a pas pu être préparée.",
+        "Hay cambios locales y en la nube. Abre Sincronización y elige qué copia conservar." to "Des modifications existent en local et dans le cloud. Ouvrez Synchronisation et choisissez la copie à conserver."
     )
 
     @JvmStatic
@@ -402,6 +453,30 @@ object UiTranslations {
     }
 
     private fun translateCount(value: String, language: String): String? {
+        Regex("^(\\d+) movimientos también existen en los datos actuales\\.$").matchEntire(value)?.let {
+            return when (language) {
+                "en" -> "${it.groupValues[1]} transactions also exist in the current data."
+                "pt" -> "${it.groupValues[1]} transações também existem nos dados atuais."
+                "fr" -> "${it.groupValues[1]} transactions existent aussi dans les données actuelles."
+                else -> value
+            }
+        }
+        Regex("^Se omitieron (\\d+) filas duplicadas dentro del archivo\\.$").matchEntire(value)?.let {
+            return when (language) {
+                "en" -> "${it.groupValues[1]} duplicate rows in the file were skipped."
+                "pt" -> "${it.groupValues[1]} linhas duplicadas do arquivo foram ignoradas."
+                "fr" -> "${it.groupValues[1]} lignes en double du fichier ont été ignorées."
+                else -> value
+            }
+        }
+        Regex("^Hay (\\d+) transferencias sin una cuenta de origen o destino completa\\.$").matchEntire(value)?.let {
+            return when (language) {
+                "en" -> "${it.groupValues[1]} transfers do not have a complete origin or destination account."
+                "pt" -> "${it.groupValues[1]} transferências não têm uma conta de origem ou destino completa."
+                "fr" -> "${it.groupValues[1]} virements n'ont pas de compte d'origine ou de destination complet."
+                else -> value
+            }
+        }
         val statusMatch = Regex("^(Importado|Reporte generado): (\\d+) (movimientos|transacciones)$").matchEntire(value)
         if (statusMatch != null) {
             val prefix = when (language) {

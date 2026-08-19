@@ -72,6 +72,8 @@ public class MoneyMateActivity extends Activity {
     private static final int IMPORT_BACKUP = 4001;
     private static final int EXPORT_BACKUP = 4002;
     private static final int EXPORT_REPORT = 4003;
+    private static final String IMPORT_PREVIEW_DB = "moneymate-import-preview.sqlite";
+    private static final String IMPORT_RECOVERY_FILE = "moneymate-before-last-import.mmbak";
 
     private MoneyDb db;
     private LinearLayout content;
@@ -359,7 +361,12 @@ public class MoneyMateActivity extends Activity {
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(12), dp(6), dp(12), dp(6));
         box.addView(iconSmallButton("Importar datos", R.drawable.ic_menu_import, v -> closeThen(holder, this::openImport)), margins(-1, dp(50), 0, 6));
-        box.addView(iconSmallButton("Exportar respaldo", R.drawable.ic_menu_export, v -> closeThen(holder, this::openExport)), margins(-1, dp(50), 0, 0));
+        box.addView(iconSmallButton("Exportar respaldo", R.drawable.ic_menu_export, v -> closeThen(holder, this::openExport)), margins(-1, dp(50), 0, 6));
+        box.addView(iconSmallButton("Revisar integridad", R.drawable.ic_menu_settings, v -> closeThen(holder, this::integrityDialog)), margins(-1, dp(50), 0, 6));
+        File recovery = importRecoveryFile();
+        if (recovery.isFile()) {
+            box.addView(iconSmallButton("Deshacer última importación", R.drawable.ic_action_back, v -> closeThen(holder, this::confirmUndoLastImport)), margins(-1, dp(50), 0, 0));
+        }
         holder[0] = new AlertDialog.Builder(this)
                 .setTitle(ui("Datos y respaldos"))
                 .setView(box)
@@ -367,6 +374,31 @@ public class MoneyMateActivity extends Activity {
                 .create();
         holder[0].show();
         styleDialog(holder[0]);
+    }
+
+    private void integrityDialog() {
+        IntegrityReport report = ImportSafety.audit(db);
+        String message = ui(report.getHealthy() ? "Datos en buen estado" : "Se encontraron observaciones")
+                + "\n\n" + ui("Base de datos") + ": " + ui(report.getDatabaseOk() ? "Correcta" : "Requiere atención")
+                + "\n" + ui("Movimientos duplicados") + ": " + report.getDuplicateMovements()
+                + "\n" + ui("Movimientos sin cuenta") + ": " + report.getOrphanMovements()
+                + "\n" + ui("Fechas o importes inválidos") + ": " + report.getInvalidMovements()
+                + "\n" + ui("Transferencias incompletas") + ": " + report.getUnpairedTransfers();
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setTitle("Integridad de los datos")
+                .setMessage(message)
+                .setNegativeButton("Cerrar", null);
+        if (report.getRepairableIssues() > 0) {
+            builder.setPositiveButton("Reparar problemas seguros", (d, w) -> {
+                db.repairSafeIntegrityIssues();
+                markLocalDataChanged();
+                draw();
+                integrityDialog();
+            });
+        }
+        AlertDialog dialog = builder.create();
+        dialog.show();
+        styleDialog(dialog);
     }
 
     private void closeThen(AlertDialog[] holder, Runnable action) {
@@ -419,7 +451,7 @@ public class MoneyMateActivity extends Activity {
         try {
             return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception ignored) {
-            return "2.0.1";
+            return "2.1.0";
         }
     }
 
@@ -1966,26 +1998,28 @@ public class MoneyMateActivity extends Activity {
 
     private void supabaseActionsDialog(String url, String key) {
         String email = prefs.getString("supabase_email", "");
+        boolean conflict = prefs.getBoolean("supabase_conflict", false);
         LinearLayout form = new LinearLayout(this);
         form.setOrientation(LinearLayout.VERTICAL);
         form.setPadding(dp(12), dp(8), dp(12), dp(4));
         TextView status = text(
                 "Cuenta conectada\n" + email
                         + "\nSincronización automática activa"
+                        + (conflict ? "\nConflicto pendiente: elige qué copia conservar" : "")
                         + "\n" + lastSupabaseSyncLabel(),
                 13,
                 true,
-                incomeColor
+                conflict ? expenseColor : incomeColor
         );
         status.setBackground(rounded(surface2, 10, 0, strokeColor));
         status.setPadding(dp(12), dp(10), dp(12), dp(10));
         form.addView(status, margins(-1, -2, 0, 12));
         AlertDialog[] holder = new AlertDialog[1];
-        form.addView(iconActionWide("Subir copia local ahora", R.drawable.ic_menu_sync, v -> {
+        form.addView(iconActionWide(conflict ? "Conservar copia local y subir" : "Subir copia local ahora", R.drawable.ic_menu_sync, v -> {
             holder[0].dismiss();
             runSupabaseSync(true, url, key);
         }));
-        form.addView(iconSmallButton("Descargar copia de la nube", R.drawable.ic_menu_import, v -> {
+        form.addView(iconSmallButton(conflict ? "Usar copia de la nube" : "Descargar copia de la nube", R.drawable.ic_menu_import, v -> {
             holder[0].dismiss();
             confirmSupabaseDownload(url, key);
         }), new LinearLayout.LayoutParams(-1, dp(48)));
@@ -2044,6 +2078,7 @@ public class MoneyMateActivity extends Activity {
                     prefs.edit()
                             .putString("supabase_remote_updated_at", remote.updatedAt)
                             .putBoolean("supabase_pending_upload", false)
+                            .putBoolean("supabase_conflict", false)
                             .apply();
                 }
                 runOnUiThread(() -> {
@@ -2092,13 +2127,16 @@ public class MoneyMateActivity extends Activity {
         new Thread(() -> {
             try {
                 SupabaseSync.Session session = storedSupabaseSession(url, key);
+                if (detectRemoteConflict(url, key, session)) return;
                 String updatedAt = SupabaseSync.upload(url, key, session, cloudSnapshotJson());
                 recordUploadSuccess(revision, updatedAt);
             } catch (Exception ex) {
                 prefs.edit().putString("supabase_last_error", String.valueOf(ex.getMessage())).apply();
             } finally {
                 releaseSyncOperation();
-                if (activityResumed && prefs.getBoolean("supabase_pending_upload", false)) {
+                if (activityResumed
+                        && prefs.getBoolean("supabase_pending_upload", false)
+                        && !prefs.getBoolean("supabase_conflict", false)) {
                     long currentRevision = prefs.getLong("supabase_local_revision", 0);
                     syncHandler.postDelayed(pendingAutoSync, currentRevision == revision ? 15000 : 900);
                 }
@@ -2109,6 +2147,7 @@ public class MoneyMateActivity extends Activity {
     private void recordUploadSuccess(long revision, String updatedAt) {
         SharedPreferences.Editor editor = prefs.edit()
                 .putLong("last_supabase_sync", System.currentTimeMillis())
+                .putBoolean("supabase_conflict", false)
                 .remove("supabase_last_error");
         if (revision == prefs.getLong("supabase_local_revision", 0)) {
             editor.putBoolean("supabase_pending_upload", false);
@@ -2122,6 +2161,7 @@ public class MoneyMateActivity extends Activity {
     private void checkForCloudUpdates() {
         if (!hasStoredSupabaseSession()
                 || prefs.getBoolean("supabase_pending_upload", false)
+                || prefs.getBoolean("supabase_conflict", false)
                 || !claimSyncOperation()) {
             return;
         }
@@ -2165,6 +2205,23 @@ public class MoneyMateActivity extends Activity {
                 });
             }
         }).start();
+    }
+
+    private boolean detectRemoteConflict(String url, String key, SupabaseSync.Session session) throws Exception {
+        try {
+            SupabaseSync.RemoteSnapshot remote = SupabaseSync.download(url, key, session);
+            String previous = prefs.getString("supabase_remote_updated_at", "");
+            if (!remote.updatedAt.isEmpty() && (previous.isEmpty() || !remote.updatedAt.equals(previous))) {
+                prefs.edit()
+                        .putBoolean("supabase_conflict", true)
+                        .putString("supabase_last_error", "Hay cambios locales y en la nube. Abre Sincronización y elige qué copia conservar.")
+                        .apply();
+                return true;
+            }
+        } catch (Exception ex) {
+            if (!String.valueOf(ex.getMessage()).contains("Todavia no existe")) throw ex;
+        }
+        return false;
     }
 
     private boolean claimSyncOperation() {
@@ -2223,6 +2280,7 @@ public class MoneyMateActivity extends Activity {
                 .remove("supabase_remote_updated_at")
                 .remove("supabase_last_error")
                 .putBoolean("supabase_pending_upload", false)
+                .putBoolean("supabase_conflict", false)
                 .apply();
     }
 
@@ -2575,32 +2633,42 @@ public class MoneyMateActivity extends Activity {
     }
 
     private void importBackup(Uri uri) {
+        if (importInProgress) {
+            toast("Ya hay una importación en curso.");
+            return;
+        }
         final String fileName = displayName(uri);
         importInProgress = true;
         if (content != null) renderScreen();
-        toast("Cargando datos...");
+        toast("Analizando archivo...");
         new Thread(() -> {
+            MoneyDb previewDb = null;
             try {
+                deleteDatabase(IMPORT_PREVIEW_DB);
+                previewDb = new MoneyDb(this, IMPORT_PREVIEW_DB);
                 String name = fileName.toLowerCase(Locale.US);
                 ImportResult result;
-                if (name.endsWith(".csv")) result = importCsv(uri);
-                else if (name.endsWith(".json")) result = importJson(uri);
-                else if (name.endsWith(".xlsx")) result = SpreadsheetExchange.importXlsx(this, uri, db, currentCurrencyCode());
+                if (name.endsWith(".csv")) result = importCsv(uri, previewDb);
+                else if (name.endsWith(".json")) result = importJson(uri, previewDb);
+                else if (name.endsWith(".xlsx")) result = SpreadsheetExchange.importXlsx(this, uri, previewDb, currentCurrencyCode());
                 else {
                     MmbakImporter importer = new MmbakImporter(this);
-                    result = importer.importInto(uri, db);
+                    result = importer.importInto(uri, previewDb);
                 }
+                int duplicatesRemoved = previewDb.removeExactDuplicateTransactions();
+                ImportPreview preview = ImportSafety.analyze(fileName, db, previewDb, duplicatesRemoved);
+                MoneyDb.ImportBundle bundle = previewDb.exportImportBundle();
+                previewDb.close();
+                previewDb = null;
+                deleteDatabase(IMPORT_PREVIEW_DB);
                 runOnUiThread(() -> {
-                    if (!prefs.contains("currency_code")) prefs.edit().putString("currency_code", db.primaryCurrency()).apply();
-                    prefs.edit().putString("last_import_name", fileName).putInt("last_import_count", result.transactions).apply();
-                    period = db.latestMonth();
-                    statsAnchorDate = db.latestDate();
                     importInProgress = false;
-                    markLocalDataChanged();
-                    toast("Importado: " + result.transactions + " movimientos");
-                    if (content != null) draw();
+                    showImportPreview(preview, bundle);
+                    if (content != null) renderScreen();
                 });
             } catch (Exception ex) {
+                if (previewDb != null) previewDb.close();
+                deleteDatabase(IMPORT_PREVIEW_DB);
                 runOnUiThread(() -> {
                     importInProgress = false;
                     toast("No se pudo importar: " + ex.getMessage());
@@ -2608,6 +2676,141 @@ public class MoneyMateActivity extends Activity {
                 });
             }
         }).start();
+    }
+
+    private void showImportPreview(ImportPreview preview, MoneyDb.ImportBundle bundle) {
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(14), dp(4), dp(14), dp(4));
+        body.addView(text(preview.getFileName(), 14, true, textColor), margins(-1, -2, 0, 10));
+        body.addView(previewMetric("Movimientos", String.valueOf(preview.getMovements())));
+        body.addView(previewMetric("Transferencias", String.valueOf(preview.getTransfers())));
+        body.addView(previewMetric("Cuentas", String.valueOf(preview.getAccounts())));
+        body.addView(previewMetric("Categorías", String.valueOf(preview.getCategories())));
+        if (!preview.getFirstDate().isEmpty()) {
+            body.addView(previewMetric("Periodo", preview.getFirstDate() + "  →  " + preview.getLastDate()));
+        }
+        body.addView(previewMetric("Ingresos", money(preview.getIncome(), preview.getCurrencyCode())));
+        body.addView(previewMetric("Gastos", money(preview.getExpense(), preview.getCurrencyCode())));
+        if (preview.getDuplicatesRemoved() > 0) {
+            body.addView(previewMetric("Duplicados omitidos", String.valueOf(preview.getDuplicatesRemoved())));
+        }
+        for (String warning : preview.getWarnings()) {
+            TextView line = text("• " + warning, 12, false, warning.contains("sin una cuenta") ? expenseColor : muted);
+            line.setPadding(0, dp(5), 0, 0);
+            body.addView(line);
+        }
+        TextView replacement = text("Al confirmar se reemplazarán los datos locales. Se guardará una copia para poder deshacer la importación.", 12, false, muted);
+        replacement.setPadding(0, dp(12), 0, 0);
+        body.addView(replacement);
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(body);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Vista previa de importación")
+                .setView(scroll)
+                .setNegativeButton("Cancelar", null)
+                .setPositiveButton("Importar ahora", (d, w) -> applyImportBundle(preview, bundle))
+                .create();
+        dialog.show();
+        styleDialog(dialog);
+    }
+
+    private View previewMetric(String label, String value) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(5), 0, dp(5));
+        row.addView(text(label, 13, false, muted), new LinearLayout.LayoutParams(0, dp(34), 1));
+        TextView amount = text(value, 13, true, textColor);
+        amount.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        row.addView(amount, new LinearLayout.LayoutParams(0, dp(34), 1));
+        return row;
+    }
+
+    private void applyImportBundle(ImportPreview preview, MoneyDb.ImportBundle bundle) {
+        importInProgress = true;
+        if (content != null) renderScreen();
+        toast("Importando datos...");
+        new Thread(() -> {
+            File recovery = importRecoveryFile();
+            try {
+                db.copyDatabaseTo(recovery, this);
+                SharedPreferences.Editor recoveryPreferences = prefs.edit()
+                        .putBoolean("last_import_had_currency", prefs.contains("currency_code"));
+                if (prefs.contains("currency_code")) {
+                    recoveryPreferences.putString("last_import_currency", prefs.getString("currency_code", "USD"));
+                } else {
+                    recoveryPreferences.remove("last_import_currency");
+                }
+                recoveryPreferences.apply();
+                db.replaceFromImport(bundle.accounts, bundle.categories, bundle.transactions);
+                runOnUiThread(() -> {
+                    if (!prefs.contains("currency_code")) prefs.edit().putString("currency_code", db.primaryCurrency()).apply();
+                    prefs.edit()
+                            .putString("last_import_name", preview.getFileName())
+                            .putInt("last_import_count", preview.getMovements())
+                            .apply();
+                    period = db.latestMonth();
+                    statsAnchorDate = db.latestDate();
+                    transactionAnchorDate = db.latestDate();
+                    importInProgress = false;
+                    markLocalDataChanged();
+                    toast("Importado: " + preview.getMovements() + " movimientos");
+                    draw();
+                });
+            } catch (Exception ex) {
+                try {
+                    if (recovery.isFile()) db.restoreDatabaseFrom(recovery, this);
+                } catch (Exception ignored) {
+                }
+                recovery.delete();
+                prefs.edit().remove("last_import_had_currency").remove("last_import_currency").apply();
+                runOnUiThread(() -> {
+                    importInProgress = false;
+                    toast("No se pudo importar: " + ex.getMessage());
+                    if (content != null) renderScreen();
+                });
+            }
+        }).start();
+    }
+
+    private File importRecoveryFile() {
+        return new File(getFilesDir(), IMPORT_RECOVERY_FILE);
+    }
+
+    private void confirmUndoLastImport() {
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Deshacer última importación")
+                .setMessage("Se restaurarán las cuentas, categorías y movimientos que existían antes de la última importación.")
+                .setNegativeButton("Cancelar", null)
+                .setPositiveButton("Restaurar", (d, w) -> undoLastImport())
+                .create();
+        dialog.show();
+        styleDialog(dialog);
+    }
+
+    private void undoLastImport() {
+        File recovery = importRecoveryFile();
+        try {
+            db.restoreDatabaseFrom(recovery, this);
+            recovery.delete();
+            SharedPreferences.Editor editor = prefs.edit()
+                    .remove("last_import_name")
+                    .remove("last_import_count");
+            if (prefs.getBoolean("last_import_had_currency", false)) {
+                editor.putString("currency_code", prefs.getString("last_import_currency", db.primaryCurrency()));
+            } else {
+                editor.remove("currency_code");
+            }
+            editor.remove("last_import_had_currency").remove("last_import_currency").apply();
+            period = db.latestMonth();
+            statsAnchorDate = db.latestDate();
+            transactionAnchorDate = db.latestDate();
+            markLocalDataChanged();
+            draw();
+            toast("Importación deshecha.");
+        } catch (Exception ex) {
+            toast("No se pudo restaurar: " + ex.getMessage());
+        }
     }
 
     private void exportBackup(Uri uri) {
@@ -2660,7 +2863,7 @@ public class MoneyMateActivity extends Activity {
         return "application/octet-stream";
     }
 
-    private ImportResult importCsv(Uri uri) throws Exception {
+    private ImportResult importCsv(Uri uri, MoneyDb target) throws Exception {
         List<ImportedAccount> accounts = new ArrayList<>();
         List<ImportedCategory> categories = new ArrayList<>();
         List<ImportedTxn> txns = new ArrayList<>();
@@ -2696,7 +2899,7 @@ public class MoneyMateActivity extends Activity {
             }
         }
         completeImportLists(accounts, categories, txns);
-        db.replaceFromImport(accounts, categories, txns);
+        target.replaceFromImport(accounts, categories, txns);
         return new ImportResult(accounts.size(), categories.size(), txns.size());
     }
 
@@ -2712,7 +2915,7 @@ public class MoneyMateActivity extends Activity {
         }
     }
 
-    private ImportResult importJson(Uri uri) throws Exception {
+    private ImportResult importJson(Uri uri, MoneyDb target) throws Exception {
         Object raw = new org.json.JSONTokener(readText(uri)).nextValue();
         List<ImportedAccount> accounts = new ArrayList<>();
         List<ImportedCategory> categories = new ArrayList<>();
@@ -2760,7 +2963,7 @@ public class MoneyMateActivity extends Activity {
                     t.optString("description", t.optString("descripcion", ""))));
         }
         completeImportLists(accounts, categories, txns);
-        db.replaceFromImport(accounts, categories, txns);
+        target.replaceFromImport(accounts, categories, txns);
         return new ImportResult(accounts.size(), categories.size(), txns.size());
     }
 
@@ -3737,7 +3940,11 @@ public class MoneyMateActivity extends Activity {
     }
 
     private String money(double value) {
-        return String.format(Locale.US, "%s%,.2f", currencySymbol(currentCurrencyCode()), value);
+        return money(value, currentCurrencyCode());
+    }
+
+    private String money(double value, String currencyCode) {
+        return String.format(Locale.US, "%s%,.2f", currencySymbol(currencyCode), value);
     }
 
     private String currentCurrencyCode() {

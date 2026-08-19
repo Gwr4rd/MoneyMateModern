@@ -18,12 +18,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-final class MoneyDb extends SQLiteOpenHelper {
+public final class MoneyDb extends SQLiteOpenHelper {
     static final String DB_NAME = "moneymate.sqlite";
     private static final int VERSION = 8;
+    private final String databaseName;
 
     MoneyDb(Context context) {
-        super(context, DB_NAME, null, VERSION);
+        this(context, DB_NAME);
+    }
+
+    MoneyDb(Context context, String databaseName) {
+        super(context, databaseName, null, VERSION);
+        this.databaseName = databaseName;
     }
 
     @Override
@@ -558,16 +564,146 @@ final class MoneyDb extends SQLiteOpenHelper {
         }
     }
 
-    File databaseFile(Context context) {
-        return context.getDatabasePath(DB_NAME);
+    ImportBundle exportImportBundle() {
+        SQLiteDatabase db = getReadableDatabase();
+        List<ImportedAccount> accounts = new ArrayList<>();
+        List<ImportedCategory> categories = new ArrayList<>();
+        List<ImportedTxn> transactions = new ArrayList<>();
+        try (Cursor c = db.rawQuery("SELECT name,COALESCE(balance,0),currency,COALESCE(type,'Cuentas de Banco'),COALESCE(description,''),COALESCE(include_total,1),COALESCE(hidden,0) FROM accounts ORDER BY id", null)) {
+            while (c.moveToNext()) {
+                accounts.add(new ImportedAccount(c.getString(0), c.getDouble(1), c.getString(2), c.getString(3), c.getString(4), c.getInt(5) == 1, c.getInt(6) == 1));
+            }
+        }
+        try (Cursor c = db.rawQuery("SELECT name,kind,color FROM categories ORDER BY id", null)) {
+            while (c.moveToNext()) categories.add(new ImportedCategory(c.getString(0), c.getString(1), c.getString(2)));
+        }
+        try (Cursor c = db.rawQuery("SELECT date,COALESCE(time,'00:00'),account,category,kind,amount,COALESCE(note,''),COALESCE(description,'') FROM transactions ORDER BY id", null)) {
+            while (c.moveToNext()) {
+                transactions.add(new ImportedTxn(c.getString(0), c.getString(1), c.getString(2), c.getString(3), c.getString(4), c.getDouble(5), c.getString(6), c.getString(7)));
+            }
+        }
+        return new ImportBundle(accounts, categories, transactions);
     }
 
-    void copyDatabaseTo(File target, Context context) throws IOException {
+    int removeExactDuplicateTransactions() {
+        SQLiteDatabase db = getWritableDatabase();
+        int before = rawTransactionCount();
+        db.beginTransaction();
+        try {
+            db.execSQL(
+                    "DELETE FROM transactions WHERE id NOT IN (" +
+                            "SELECT MIN(id) FROM transactions GROUP BY date,COALESCE(time,'00:00')," +
+                            "lower(trim(account)),lower(trim(category)),kind,round(amount,2)," +
+                            "lower(trim(COALESCE(note,''))),lower(trim(COALESCE(description,''))))"
+            );
+            db.execSQL("UPDATE transactions SET transfer_ref=NULL WHERE category='Transferencia'");
+            backfillTransferRefs(db);
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+        return Math.max(0, before - rawTransactionCount());
+    }
+
+    int rawTransactionCount() {
+        SQLiteDatabase db = getReadableDatabase();
+        try (Cursor c = db.rawQuery("SELECT COUNT(*) FROM transactions", null)) {
+            return c.moveToFirst() ? c.getInt(0) : 0;
+        }
+    }
+
+    int duplicateTransactionCount() {
+        SQLiteDatabase db = getReadableDatabase();
+        String sql = "SELECT COUNT(*) FROM transactions WHERE id NOT IN (" +
+                "SELECT MIN(id) FROM transactions GROUP BY date,COALESCE(time,'00:00')," +
+                "lower(trim(account)),lower(trim(category)),kind,round(amount,2)," +
+                "lower(trim(COALESCE(note,''))),lower(trim(COALESCE(description,''))))";
+        try (Cursor c = db.rawQuery(sql, null)) {
+            return c.moveToFirst() ? c.getInt(0) : 0;
+        }
+    }
+
+    int orphanTransactionCount() {
+        SQLiteDatabase db = getReadableDatabase();
+        try (Cursor c = db.rawQuery("SELECT COUNT(*) FROM transactions t LEFT JOIN accounts a ON lower(trim(a.name))=lower(trim(t.account)) WHERE a.id IS NULL", null)) {
+            return c.moveToFirst() ? c.getInt(0) : 0;
+        }
+    }
+
+    int invalidTransactionCount() {
+        SQLiteDatabase db = getReadableDatabase();
+        try (Cursor c = db.rawQuery("SELECT COUNT(*) FROM transactions WHERE amount<=0 OR date NOT GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' OR COALESCE(time,'') NOT GLOB '[0-9][0-9]:[0-9][0-9]'", null)) {
+            return c.moveToFirst() ? c.getInt(0) : 0;
+        }
+    }
+
+    String sqliteIntegrityCheck() {
+        SQLiteDatabase db = getReadableDatabase();
+        try (Cursor c = db.rawQuery("PRAGMA integrity_check", null)) {
+            return c.moveToFirst() ? c.getString(0) : "unknown";
+        }
+    }
+
+    void repairSafeIntegrityIssues() {
+        SQLiteDatabase db = getWritableDatabase();
+        String currency = primaryCurrency();
+        db.beginTransaction();
+        try {
+            db.execSQL(
+                    "INSERT INTO accounts(name,balance,currency,type,description,include_total,hidden) " +
+                            "SELECT DISTINCT trim(t.account),0,?,'Cuentas de Banco','Recuperada automáticamente',1,0 " +
+                            "FROM transactions t LEFT JOIN accounts a ON lower(trim(a.name))=lower(trim(t.account)) " +
+                            "WHERE a.id IS NULL AND trim(t.account)<>''",
+                    new Object[]{currency}
+            );
+            dedupeAccounts(db);
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+        removeExactDuplicateTransactions();
+    }
+
+    String earliestDate() {
+        SQLiteDatabase db = getReadableDatabase();
+        try (Cursor c = db.rawQuery("SELECT MIN(date) FROM transactions", null)) {
+            return c.moveToFirst() && !c.isNull(0) ? c.getString(0) : "";
+        }
+    }
+
+    File databaseFile(Context context) {
+        return context.getDatabasePath(databaseName);
+    }
+
+    synchronized void copyDatabaseTo(File target, Context context) throws IOException {
+        close();
         try (FileInputStream in = new FileInputStream(databaseFile(context)); FileOutputStream out = new FileOutputStream(target)) {
             byte[] buffer = new byte[8192];
             int read;
             while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
         }
+        getWritableDatabase();
+    }
+
+    synchronized void restoreDatabaseFrom(File source, Context context) throws IOException {
+        if (source == null || !source.isFile()) throw new IOException("No existe una copia de recuperación.");
+        close();
+        File database = databaseFile(context);
+        File parent = database.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) throw new IOException("No se pudo preparar la base de datos.");
+        deleteSidecar(database, "-wal");
+        deleteSidecar(database, "-shm");
+        try (FileInputStream in = new FileInputStream(source); FileOutputStream out = new FileOutputStream(database, false)) {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
+        }
+        getWritableDatabase();
+    }
+
+    private void deleteSidecar(File database, String suffix) {
+        File sidecar = new File(database.getAbsolutePath() + suffix);
+        if (sidecar.exists()) sidecar.delete();
     }
 
     private void insertTransaction(SQLiteDatabase db, String date, String time, String account, String category, String kind, double amount, String note, String description, String transferRef) {
@@ -842,6 +978,18 @@ final class MoneyDb extends SQLiteOpenHelper {
             this.description = description == null ? "" : description;
             this.includeTotal = includeTotal;
             this.hidden = hidden;
+        }
+    }
+
+    static final class ImportBundle {
+        final List<ImportedAccount> accounts;
+        final List<ImportedCategory> categories;
+        final List<ImportedTxn> transactions;
+
+        ImportBundle(List<ImportedAccount> accounts, List<ImportedCategory> categories, List<ImportedTxn> transactions) {
+            this.accounts = accounts;
+            this.categories = categories;
+            this.transactions = transactions;
         }
     }
 

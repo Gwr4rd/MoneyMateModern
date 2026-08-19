@@ -16,10 +16,14 @@ Aplicacion de finanzas personales sin anuncios para Android 10 o superior, acomp
 - Tipos de cuenta, cuentas y categorias personalizables, ocultables y recuperables.
 - Monedas por pais, incluido Sol peruano (`PEN`, `S/`).
 - Importacion y exportacion MMBAK, CSV, JSON y XLSX.
+- Vista previa de importacion con conteos, periodo, duplicados y advertencias antes de reemplazar datos.
+- Recuperacion de la base anterior mediante `Deshacer ultima importacion`.
 - Reportes XLS y XLSX por semana, mes, año o todo.
 - Sincronizacion opcional Android/web con sesion persistente y renovación segura del acceso.
 - Sincronizacion automatica al modificar datos y comprobacion periodica de cambios en la nube.
+- Proteccion de conflictos para elegir entre la copia local y la nube sin sobrescrituras silenciosas.
 - Manual de Supabase integrado con el script SQL listo para copiar.
+- Auditoria y reparacion segura de duplicados y movimientos sin cuenta desde `Datos y respaldos`.
 - Seccion Acerca de con version, desarrollador y enlace a los repositorios de Gwr4rd.
 - Deduplicacion de cuentas por nombre al importar y al actualizar bases existentes.
 

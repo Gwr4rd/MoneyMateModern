@@ -966,7 +966,8 @@ select:focus-visible {
 
 .movement-form,
 .sync-form,
-.report-form {
+.report-form,
+.backup-dialog {
   display: grid;
   gap: 12px;
   padding: 18px;
@@ -1195,6 +1196,85 @@ select:focus-visible {
   overflow-wrap: anywhere;
   color: var(--muted);
   font-size: 11px;
+}
+
+.sync-status.connected.conflict {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.backup-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.backup-actions button,
+.backup-actions label {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--control);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.backup-actions input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.backup-preview {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.backup-preview-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.backup-preview-grid > div {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+
+.backup-preview-grid span,
+.backup-preview-grid strong {
+  display: block;
+}
+
+.backup-preview-grid span {
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.backup-preview-grid strong {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.backup-preview p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.backup-warning {
+  color: var(--red);
 }
 
 .sync-account-tabs {
