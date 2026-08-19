@@ -604,9 +604,9 @@ select:focus-visible {
 
 .chart-layout {
   display: grid;
-  grid-template-columns: minmax(160px, 240px) minmax(220px, 1fr);
+  grid-template-columns: minmax(150px, 210px) minmax(220px, 1fr);
   align-items: center;
-  gap: 24px;
+  gap: 20px;
 }
 
 .compact .chart-layout {
@@ -615,13 +615,20 @@ select:focus-visible {
 }
 
 .donut {
-  width: min(100%, 220px);
+  width: min(100%, 190px);
   aspect-ratio: 1;
   display: grid;
   place-items: center;
   margin: auto;
   border-radius: 50%;
   transition: background 260ms ease, transform 220ms ease;
+}
+
+.chart-caption {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .donut:hover {
@@ -1598,7 +1605,7 @@ select:focus-visible {
   }
 
   .donut {
-    width: 210px;
+    width: 174px;
   }
 
   .accounts-panel.full {

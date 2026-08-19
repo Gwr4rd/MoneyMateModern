@@ -113,10 +113,10 @@ Referencias:
 ## 4. Crear el Release de GitHub
 
 1. Abre `Releases > Draft a new release`.
-2. Crea la etiqueta `v2.0.0`.
-3. Usa como titulo `Control Financiero 2.0.0`.
+2. Crea la etiqueta `v2.0.1`.
+3. Usa como titulo `Control Financiero 2.0.1`.
 4. Pega el contenido de `RELEASE_NOTES.md`.
-5. Adjunta `Control-Financiero-release-signed-v2.0.0.apk`.
+5. Adjunta `Control-Financiero-release-signed-v2.0.1.apk`.
 6. Publica el release.
 
 Referencia: [Administrar Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository).

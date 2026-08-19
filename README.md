@@ -10,7 +10,7 @@ Aplicacion de finanzas personales sin anuncios para Android 10 o superior, acomp
 - Gastos, ingresos y transferencias editables y copiables.
 - Transferencias agrupadas visualmente en una sola fila, con texto azul y sin sombreado.
 - Busqueda por cuenta, categoria, notas, descripcion, fechas, tipo e importe.
-- Estado diario, semanal, mensual, semestral, anual o completo con graficas animadas.
+- Estado diario, semanal, mensual, semestral, anual o completo con graficas por cuenta y leyendas completas.
 - Exportacion de ingresos y gastos juntos en un unico archivo XLSX desde Estado.
 - Cuentas organizadas por tipos editables, incluidos `Efectivo` y `Cuentas de Banco`.
 - Tipos de cuenta, cuentas y categorias personalizables, ocultables y recuperables.

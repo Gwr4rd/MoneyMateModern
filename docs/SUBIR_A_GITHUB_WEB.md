@@ -57,7 +57,7 @@ RELEASE_NOTES.md
 settings.gradle
 ```
 
-1. En `Commit message` escribe `Publicar Control Financiero 2.0.0`.
+1. En `Commit message` escribe `Publicar Control Financiero 2.0.1`.
 2. Selecciona `Commit directly to the main branch`.
 3. Pulsa `Commit changes`.
 4. Espera a que GitHub vuelva a la pagina principal del repositorio.

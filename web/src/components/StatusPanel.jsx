@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { FileSpreadsheet } from "lucide-react";
-import { categoryTotals, currency, inRange, rangeFor, statusSummary } from "../lib/finance";
+import { accountFlowTotals, currency, inRange, rangeFor, statusSummary } from "../lib/finance";
 import { t } from "../i18n";
 
 const scopes = [
@@ -16,7 +16,7 @@ const palette = ["#ff3b5c", "#ff8a34", "#ffca28", "#00b894", "#00a8e8", "#3d5afe
 export function StatusPanel({ data, scope, anchor, kind, onScope, onKind, onExport, language, compact = false }) {
   const range = useMemo(() => rangeFor(scope, anchor, language), [scope, anchor, language]);
   const rows = useMemo(() => data.transactions.filter((transaction) => inRange(transaction, range)), [data.transactions, range]);
-  const totals = useMemo(() => categoryTotals(rows, kind), [rows, kind]);
+  const totals = useMemo(() => accountFlowTotals(rows, kind), [rows, kind]);
   const summaryValue = useMemo(() => statusSummary(rows), [rows]);
   const total = totals.reduce((sum, item) => sum + item.value, 0);
   const gradient = donutGradient(totals, total);
@@ -41,6 +41,7 @@ export function StatusPanel({ data, scope, anchor, kind, onScope, onKind, onExpo
           <button className={scope === value ? "active" : ""} onClick={() => onScope(value)} key={value}>{t(label, language)}</button>
         ))}
       </div>
+      <p className="chart-caption">{t("Distribución por cuenta", language)}</p>
       <div className="chart-layout">
         <div className="donut" style={{ background: gradient }}>
           <div>
@@ -52,7 +53,7 @@ export function StatusPanel({ data, scope, anchor, kind, onScope, onKind, onExpo
           {totals.length ? totals.map((item, index) => (
             <div className="legend-row" key={item.label}>
               <i style={{ backgroundColor: palette[index % palette.length] }} />
-              <span>{t(item.label, language)}</span>
+              <span>{item.label}</span>
               <strong>{total ? Math.round(item.value * 100 / total) : 0}%</strong>
               <small>{currency(item.value, data.currency)}</small>
             </div>

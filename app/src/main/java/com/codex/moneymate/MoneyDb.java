@@ -354,6 +354,24 @@ final class MoneyDb extends SQLiteOpenHelper {
         return rows;
     }
 
+    List<Bar> accountFlowTotalsBetween(String kind, String startDate, String endDate) {
+        SQLiteDatabase db = getReadableDatabase();
+        List<Bar> rows = new ArrayList<>();
+        String sql = "SELECT account,SUM(amount) FROM transactions WHERE kind=?";
+        List<String> args = new ArrayList<>();
+        args.add(kind);
+        if (startDate != null && endDate != null) {
+            sql += " AND date>=? AND date<=?";
+            args.add(startDate);
+            args.add(endDate);
+        }
+        sql += " GROUP BY account ORDER BY SUM(amount) DESC,account COLLATE NOCASE";
+        try (Cursor c = db.rawQuery(sql, args.toArray(new String[0]))) {
+            while (c.moveToNext()) rows.add(new Bar(c.getString(0), c.getDouble(1)));
+        }
+        return rows;
+    }
+
     void addTransaction(String date, String account, String category, String kind, double amount, String note) {
         addTransaction(date, "00:00", account, category, kind, amount, note, "");
     }

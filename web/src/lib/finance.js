@@ -119,6 +119,22 @@ export function categoryTotals(transactions, kind) {
     .sort((left, right) => right.value - left.value);
 }
 
+export function accountFlowTotals(transactions, kind) {
+  const totals = new Map();
+  for (const transaction of transactions) {
+    let account = "";
+    if (transaction.kind === kind) account = transaction.account;
+    if (transaction.kind === "transfer") {
+      account = kind === "income" ? transaction.toAccount : transaction.account;
+    }
+    if (!account) continue;
+    totals.set(account, (totals.get(account) || 0) + Number(transaction.amount));
+  }
+  return [...totals.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label));
+}
+
 export function reportRows(transactions) {
   return transactions.map((transaction) => ({
     Fecha: transaction.date,

@@ -14,6 +14,8 @@ final class PieChartView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final List<MoneyDb.Bar> data = new ArrayList<>();
     private int textColor = Color.WHITE;
+    private String centerTitle = "";
+    private String centerSubtitle = "";
     private final int[] colors = new int[]{
             Color.rgb(255, 59, 92),
             Color.rgb(255, 138, 52),
@@ -40,17 +42,25 @@ final class PieChartView extends View {
         invalidate();
     }
 
+    void setCenterText(String title, String subtitle) {
+        centerTitle = title == null ? "" : title;
+        centerSubtitle = subtitle == null ? "" : subtitle;
+        invalidate();
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         double total = 0;
         for (MoneyDb.Bar b : data) total += b.value;
-        float padding = Math.max(18f, Math.min(getWidth(), getHeight()) * 0.08f);
-        float size = Math.max(1f, Math.min(getWidth(), getHeight()) - padding * 2f);
-        float left = (getWidth() - size) / 2f;
-        float top = (getHeight() - size) / 2f;
-        RectF rect = new RectF(left, top, left + size, top + size);
-        float stroke = Math.max(24f, size * 0.22f);
+        float density = getResources().getDisplayMetrics().scaledDensity;
+        float available = Math.max(1f, Math.min(getWidth(), getHeight()));
+        float outerSize = available * 0.72f;
+        float stroke = Math.max(18f * density, outerSize * 0.18f);
+        float arcSize = Math.max(1f, outerSize - stroke);
+        float left = (getWidth() - arcSize) / 2f;
+        float top = (getHeight() - arcSize) / 2f;
+        RectF rect = new RectF(left, top, left + arcSize, top + arcSize);
 
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(stroke);
@@ -70,9 +80,12 @@ final class PieChartView extends View {
         paint.setStyle(Paint.Style.FILL);
         paint.setTextAlign(Paint.Align.CENTER);
         paint.setColor(textColor);
-        paint.setTextSize(Math.max(18f, size * 0.075f));
+        paint.setTextSize(17f * density);
         paint.setFakeBoldText(true);
-        canvas.drawText("100%", rect.centerX(), rect.centerY() + paint.getTextSize() * 0.15f, paint);
+        canvas.drawText(centerTitle, rect.centerX(), rect.centerY() - 2f * density, paint);
         paint.setFakeBoldText(false);
+        paint.setTextSize(11f * density);
+        paint.setColor(Color.argb(190, Color.red(textColor), Color.green(textColor), Color.blue(textColor)));
+        canvas.drawText(centerSubtitle, rect.centerX(), rect.centerY() + 15f * density, paint);
     }
 }

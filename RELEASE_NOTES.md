@@ -1,28 +1,26 @@
-# Control Financiero 2.0.0
+# Control Financiero 2.0.1
 
-Control Financiero estrena nombre y una actualización amplia para Android 10 o superior y la aplicación web.
+Actualización de visualización y experiencia para Android 10 o superior y la aplicación web.
 
-## Novedades
+## Mejoras
 
-- Interfaz disponible en español, inglés, portugués y francés.
-- Tipos de cuenta y categorías editables, con posibilidad de crear opciones nuevas.
-- Selector de cuentas filtrado por tipo, con cuentas activas primero y resaltadas.
-- Al copiar una transacción con fecha actual también se utiliza la hora actual.
-- Transferencias incluidas correctamente como salida de la cuenta de origen y entrada en la cuenta de destino.
-- Estado diario, semanal, mensual, semestral, anual o completo con gráficos más claros y colores diferenciados.
-- Exportación del Estado a un único XLSX con ingresos y gastos juntos.
-- Menú Acerca de con nombre, versión, desarrollador y enlace a los repositorios de Gwr4rd.
-- Compatibilidad conservada con respaldos MMBAK, CSV, JSON y XLSX, además de sincronización mediante Supabase.
+- Las gráficas de Estado ahora distribuyen ingresos y gastos por cuenta, no por tipo ni categoría.
+- Las transferencias se atribuyen a la cuenta de origen en Gastos y a la cuenta de destino en Ingresos.
+- Gráfico circular más pequeño, centrado y con margen suficiente para evitar recortes.
+- Leyenda más clara con nombre de cuenta, porcentaje e importe.
+- Barra de estado y navegación de Android con iconos legibles en modo claro y oscuro.
+- Encabezado Android más limpio y cercano al estilo visual actual del sistema.
+- Menú de tres puntos reducido a siete grupos para mostrar todas las opciones sin desplazamientos innecesarios.
+- Idioma, moneda y tema reunidos en Preferencias; importar y exportar reunidos en Datos y respaldos.
 
 ## Instalación
 
-1. Descarga `Control-Financiero-release-signed-v2.0.0.apk`.
-2. Permite la instalación desde el navegador o gestor de archivos.
-3. Instala la actualización sobre la versión anterior para conservar sus datos locales.
+1. Descarga `Control-Financiero-release-signed-v2.0.1.apk`.
+2. Instálala sobre la versión anterior para conservar los datos locales.
 
 ## Requisitos
 
 - Android 10 o posterior.
-- Para sincronizar, configura tu propio proyecto de Supabase desde el manual integrado.
+- La sincronización con Supabase continúa siendo opcional.
 
-La aplicación no contiene anuncios. El identificador interno se mantiene sin cambios para que Android reconozca esta versión como una actualización compatible.
+El identificador interno y la firma se mantienen para que Android reconozca esta versión como una actualización compatible.

@@ -79,7 +79,7 @@ public class MoneyMateActivity extends Activity {
     private String transactionMode = "diario";
     private String accountMode = "diario";
     private String statsKind = "expense";
-    private String statsDetailCategory;
+    private String statsDetailAccount;
     private String statsScope = "mensual";
     private String statsAnchorDate;
     private String transactionAnchorDate;
@@ -207,22 +207,22 @@ public class MoneyMateActivity extends Activity {
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setPadding(dp(4), dp(4), dp(2), dp(4));
-        top.setBackground(rounded(topSurface, 8, 1, strokeColor));
+        top.setPadding(dp(6), dp(4), dp(4), dp(4));
+        top.setBackground(rounded(topSurface, 16, 0, strokeColor));
         top.setElevation(0);
-        top.setLayoutParams(margins(-1, dp(62), 0, 10));
+        top.setLayoutParams(margins(-1, dp(64), 0, 10));
 
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.app_pig);
         logo.setAdjustViewBounds(true);
         logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        top.addView(logo, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        top.addView(logo, new LinearLayout.LayoutParams(dp(40), dp(40)));
 
         String subtitle;
         if ("stats".equals(screen)) subtitle = titleForScreen() + " · " + statsRange().label;
         else if ("trans".equals(screen)) subtitle = titleForScreen() + " · " + transactionRangeLabel();
         else subtitle = titleForScreen() + " · " + monthLabel(period);
-        TextView title = text("", 18, true, textColor);
+        TextView title = text("", 19, true, textColor);
         title.setText(appHeaderText("Control Financiero", ui(subtitle)));
         title.setGravity(Gravity.CENTER);
         title.setOnClickListener(v -> {
@@ -231,7 +231,7 @@ public class MoneyMateActivity extends Activity {
             else monthDialog();
         });
         top.addView(title, new LinearLayout.LayoutParams(0, dp(52), 1));
-        top.addView(topIcon("⋮", v -> menuDialog(v)), new LinearLayout.LayoutParams(dp(48), dp(48)));
+        top.addView(topIcon("⋮", v -> menuDialog(v)), new LinearLayout.LayoutParams(dp(50), dp(50)));
         return top;
     }
 
@@ -293,8 +293,15 @@ public class MoneyMateActivity extends Activity {
             transferSoft = Color.rgb(231, 241, 255);
             strokeColor = Color.rgb(225, 231, 227);
         }
-        getWindow().setStatusBarColor(bg);
-        getWindow().setNavigationBarColor(bg);
+        Window window = getWindow();
+        window.setStatusBarColor(bg);
+        window.setNavigationBarColor(bg);
+        window.setStatusBarContrastEnforced(false);
+        window.setNavigationBarContrastEnforced(false);
+        int flags = window.getDecorView().getSystemUiVisibility();
+        int lightSystemBars = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        flags = darkMode ? flags & ~lightSystemBars : flags | lightSystemBars;
+        window.getDecorView().setSystemUiVisibility(flags);
     }
 
     private void toggleTheme() {
@@ -306,30 +313,60 @@ public class MoneyMateActivity extends Activity {
         PopupWindow[] holder = new PopupWindow[1];
         LinearLayout menu = new LinearLayout(this);
         menu.setOrientation(LinearLayout.VERTICAL);
-        menu.setPadding(dp(14), dp(12), dp(14), dp(12));
-        menu.setBackground(rounded(surface, 24, 0, strokeColor));
+        menu.setPadding(dp(10), dp(8), dp(10), dp(8));
+        menu.setBackground(rounded(surface, 16, 0, strokeColor));
         menu.addView(menuItem(R.drawable.ic_menu_period, "Periodo", "Elegir fecha con calendario", v -> closeThen(holder, () -> {
             if ("stats".equals(screen)) statsDateDialog();
             else monthDialog();
         })));
-        menu.addView(menuItem(R.drawable.ic_menu_settings, "Configuracion", "Preferencias generales", v -> closeThen(holder, () -> settingsDialog())));
-        menu.addView(menuItem(R.drawable.ic_menu_settings, "Idioma", "Cambiar idioma de la interfaz", v -> closeThen(holder, this::languageDialog)));
-        menu.addView(menuItem(darkMode ? R.drawable.ic_menu_sun : R.drawable.ic_menu_moon_cloud, darkMode ? "Modo claro" : "Modo oscuro", "Cambiar apariencia", v -> closeThen(holder, () -> toggleTheme())));
-        menu.addView(menuItem(R.drawable.ic_menu_currency, "Moneda", "Pais y simbolo de importes", v -> closeThen(holder, () -> currencyDialog())));
+        menu.addView(menuItem(R.drawable.ic_menu_settings, "Preferencias", "Idioma, moneda y apariencia", v -> closeThen(holder, this::preferencesDialog)));
         menu.addView(menuItem(R.drawable.ic_menu_categories, "Categorias", "Ingresos, gastos y transferencias", v -> closeThen(holder, () -> categoryDialog())));
         menu.addView(menuItem(R.drawable.ic_menu_report, "Generar reporte", "Semanal, mensual, anual o todo", v -> closeThen(holder, this::reportDialog)));
         menu.addView(menuItem(R.drawable.ic_menu_sync, "Sincronizar", "Subir o descargar desde Supabase", v -> closeThen(holder, this::supabaseDialog)));
-        menu.addView(menuItem(R.drawable.ic_menu_import, "Importar datos", "MMBAK, CSV, JSON o XLSX", v -> closeThen(holder, () -> openImport())));
-        menu.addView(menuItem(R.drawable.ic_menu_export, "Exportar respaldo", "MMBAK, CSV, JSON o XLSX", v -> closeThen(holder, () -> openExport())));
+        menu.addView(menuItem(R.drawable.ic_menu_import, "Datos y respaldos", "Importar o exportar archivos", v -> closeThen(holder, this::dataBackupDialog)));
         menu.addView(menuItem(R.drawable.ic_menu_settings, "Acerca de", "Nombre, version y desarrollador", v -> closeThen(holder, this::aboutDialog)));
         ScrollView menuScroll = new ScrollView(this);
         menuScroll.setFillViewport(false);
         menuScroll.addView(menu);
-        holder[0] = new PopupWindow(menuScroll, dp(304), dp(620), true);
+        int popupHeight = Math.min(dp(420), getResources().getDisplayMetrics().heightPixels - dp(120));
+        holder[0] = new PopupWindow(menuScroll, dp(296), popupHeight, true);
         holder[0].setOutsideTouchable(true);
-        holder[0].setBackgroundDrawable(rounded(surface, 24, 0, strokeColor));
+        holder[0].setBackgroundDrawable(rounded(surface, 16, 0, strokeColor));
         holder[0].setElevation(0);
-        holder[0].showAsDropDown(anchor, -dp(248), dp(8));
+        holder[0].showAsDropDown(anchor, -dp(242), dp(4));
+    }
+
+    private void preferencesDialog() {
+        AlertDialog[] holder = new AlertDialog[1];
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(12), dp(6), dp(12), dp(6));
+        box.addView(iconSmallButton("Idioma", R.drawable.ic_menu_settings, v -> closeThen(holder, this::languageDialog)), margins(-1, dp(50), 0, 6));
+        box.addView(iconSmallButton("Moneda", R.drawable.ic_menu_currency, v -> closeThen(holder, this::currencyDialog)), margins(-1, dp(50), 0, 6));
+        box.addView(iconSmallButton(darkMode ? "Modo claro" : "Modo oscuro", darkMode ? R.drawable.ic_menu_sun : R.drawable.ic_menu_moon_cloud, v -> closeThen(holder, this::toggleTheme)), margins(-1, dp(50), 0, 0));
+        holder[0] = new AlertDialog.Builder(this)
+                .setTitle(ui("Preferencias"))
+                .setView(box)
+                .setNegativeButton(ui("Cerrar"), null)
+                .create();
+        holder[0].show();
+        styleDialog(holder[0]);
+    }
+
+    private void dataBackupDialog() {
+        AlertDialog[] holder = new AlertDialog[1];
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(12), dp(6), dp(12), dp(6));
+        box.addView(iconSmallButton("Importar datos", R.drawable.ic_menu_import, v -> closeThen(holder, this::openImport)), margins(-1, dp(50), 0, 6));
+        box.addView(iconSmallButton("Exportar respaldo", R.drawable.ic_menu_export, v -> closeThen(holder, this::openExport)), margins(-1, dp(50), 0, 0));
+        holder[0] = new AlertDialog.Builder(this)
+                .setTitle(ui("Datos y respaldos"))
+                .setView(box)
+                .setNegativeButton(ui("Cerrar"), null)
+                .create();
+        holder[0].show();
+        styleDialog(holder[0]);
     }
 
     private void closeThen(AlertDialog[] holder, Runnable action) {
@@ -382,7 +419,7 @@ public class MoneyMateActivity extends Activity {
         try {
             return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception ignored) {
-            return "2.0.0";
+            return "2.0.1";
         }
     }
 
@@ -390,18 +427,18 @@ public class MoneyMateActivity extends Activity {
         LinearLayout item = new LinearLayout(this);
         item.setOrientation(LinearLayout.HORIZONTAL);
         item.setGravity(Gravity.CENTER_VERTICAL);
-        item.setPadding(dp(10), dp(8), dp(10), dp(8));
+        item.setPadding(dp(8), dp(5), dp(8), dp(5));
         item.setBackground(rounded(surface2, 8, 0, strokeColor));
-        item.setLayoutParams(margins(-1, -2, 0, 8));
+        item.setLayoutParams(margins(-1, -2, 0, 4));
         Drawable drawable = getResources().getDrawable(drawableRes).mutate();
         drawable.setTint(actionColor);
         ImageView icon = new ImageView(this);
         icon.setImageDrawable(drawable);
         icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         icon.setPadding(dp(6), dp(6), dp(6), dp(6));
-        item.addView(icon, new LinearLayout.LayoutParams(dp(42), dp(42)));
-        TextView label = text(title + "\n" + subtitle, 14, true, textColor);
-        label.setPadding(dp(10), 0, 0, 0);
+        item.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        TextView label = text(title + "\n" + subtitle, 13, true, textColor);
+        label.setPadding(dp(8), 0, 0, 0);
         item.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
         item.setOnClickListener(listener);
         return item;
@@ -579,11 +616,11 @@ public class MoneyMateActivity extends Activity {
     private void renderStats() {
         DateRange range = statsRange();
         MoneyDb.Summary s = db.summaryBetween(range.start, range.end);
-        if (statsDetailCategory != null) {
+        if (statsDetailAccount != null) {
             renderStatsDetail();
             return;
         }
-        List<MoneyDb.Bar> bars = db.categoryTotalsBetween(statsKind, range.start, range.end);
+        List<MoneyDb.Bar> bars = db.accountFlowTotalsBetween(statsKind, range.start, range.end);
 
         content.addView(statsPeriodHeader());
         content.addView(statsTotalsHeader(s));
@@ -592,12 +629,15 @@ public class MoneyMateActivity extends Activity {
         PieChartView pie = new PieChartView(this);
         pie.setData(bars);
         pie.setTextColor(textColor);
+        pie.setCenterText(String.valueOf(bars.size()), ui(bars.size() == 1 ? "Cuenta" : "Cuentas"));
+        pie.setContentDescription(ui("Distribución por cuenta"));
 
         LinearLayout pieBox = flatSection();
+        pieBox.addView(text("Distribución por cuenta", 12, true, muted));
         if (bars.isEmpty()) {
             pieBox.addView(empty("Sin datos en este periodo."));
         } else {
-            pieBox.addView(pie, new LinearLayout.LayoutParams(-1, dp(230)));
+            pieBox.addView(pie, new LinearLayout.LayoutParams(-1, dp(206)));
             animateChart(pie);
         }
         content.addView(pieBox);
@@ -615,10 +655,10 @@ public class MoneyMateActivity extends Activity {
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(0, dp(4), 0, dp(8));
         head.addView(iconButton(R.drawable.ic_action_back, v -> {
-            statsDetailCategory = null;
+            statsDetailAccount = null;
             renderScreen();
         }), new LinearLayout.LayoutParams(dp(42), dp(40)));
-        TextView title = text(statsDetailCategory, 18, true, textColor);
+        TextView title = text(statsDetailAccount, 18, true, textColor);
         title.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(title, new LinearLayout.LayoutParams(0, dp(44), 1));
         TextView month = text(statsRange().label, 14, true, muted);
@@ -626,7 +666,7 @@ public class MoneyMateActivity extends Activity {
         head.addView(month, new LinearLayout.LayoutParams(dp(116), dp(44)));
         content.addView(head);
 
-        List<MoneyDb.Row> rows = filteredCategoryRows();
+        List<MoneyDb.Row> rows = filteredAccountRows();
         double total = 0;
         for (MoneyDb.Row row : rows) total += row.amount;
         LinearLayout balance = compactPanel();
@@ -644,12 +684,16 @@ public class MoneyMateActivity extends Activity {
         renderTransactionRows(rows, false);
     }
 
-    private List<MoneyDb.Row> filteredCategoryRows() {
+    private List<MoneyDb.Row> filteredAccountRows() {
         List<MoneyDb.Row> out = new ArrayList<>();
         DateRange range = statsRange();
         for (MoneyDb.Row row : db.transactionsForDisplay(range.start, range.end)) {
-            if ("Transferencia".equals(statsDetailCategory) && row.isTransfer()) out.add(row);
-            else if (row.category.equals(statsDetailCategory) && row.kind.equals(statsKind)) out.add(row);
+            if (row.isTransfer()) {
+                String account = "income".equals(statsKind) ? row.transferTo : row.transferFrom;
+                if (statsDetailAccount.equals(account)) out.add(row);
+            } else if (row.account.equals(statsDetailAccount) && row.kind.equals(statsKind)) {
+                out.add(row);
+            }
         }
         return out;
     }
@@ -719,7 +763,7 @@ public class MoneyMateActivity extends Activity {
         income.setGravity(Gravity.CENTER);
         income.setOnClickListener(v -> {
             statsKind = "income";
-            statsDetailCategory = null;
+            statsDetailAccount = null;
             renderScreen();
         });
         row.addView(income, new LinearLayout.LayoutParams(0, dp(42), 1));
@@ -727,7 +771,7 @@ public class MoneyMateActivity extends Activity {
         expense.setGravity(Gravity.CENTER);
         expense.setOnClickListener(v -> {
             statsKind = "expense";
-            statsDetailCategory = null;
+            statsDetailAccount = null;
             renderScreen();
         });
         row.addView(expense, new LinearLayout.LayoutParams(0, dp(42), 1));
@@ -785,7 +829,7 @@ public class MoneyMateActivity extends Activity {
         amount.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         row.addView(amount, new LinearLayout.LayoutParams(dp(112), dp(48)));
         row.setOnClickListener(v -> {
-            statsDetailCategory = bar.label;
+            statsDetailAccount = bar.label;
             renderScreen();
         });
         return row;
@@ -2326,7 +2370,7 @@ public class MoneyMateActivity extends Activity {
                 .setTitle("Filtrar estado")
                 .setSingleChoiceItems(labels, checked, (d, which) -> {
                     statsScope = values[which];
-                    statsDetailCategory = null;
+                    statsDetailAccount = null;
                     d.dismiss();
                     renderScreen();
                 })
@@ -2342,7 +2386,7 @@ public class MoneyMateActivity extends Activity {
         DatePickerDialog dialog = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
             statsAnchorDate = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
             period = statsAnchorDate.substring(0, 7);
-            statsDetailCategory = null;
+            statsDetailAccount = null;
             renderScreen();
         }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH));
         dialog.show();
@@ -2359,7 +2403,7 @@ public class MoneyMateActivity extends Activity {
         else cal.add(Calendar.MONTH, direction);
         statsAnchorDate = isoDate(cal);
         period = statsAnchorDate.substring(0, 7);
-        statsDetailCategory = null;
+        statsDetailAccount = null;
         renderScreen();
     }
 
@@ -3231,7 +3275,7 @@ public class MoneyMateActivity extends Activity {
     private void screenTo(String target) {
         screen = target;
         if (!"accounts".equals(target)) activeAccountId = -1;
-        if (!"stats".equals(target)) statsDetailCategory = null;
+        if (!"stats".equals(target)) statsDetailAccount = null;
         draw();
     }
 
