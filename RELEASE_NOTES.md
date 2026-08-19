@@ -1,35 +1,28 @@
-# MoneyMate Modern 1.4.2
+# Control Financiero 2.0.0
 
-Aplicación de finanzas personales moderna, sin anuncios y compatible con Android 10 o superior.
+Control Financiero estrena nombre y una actualización amplia para Android 10 o superior y la aplicación web.
 
-## Cambios de esta versión
+## Novedades
 
-- Al crear, editar o copiar un movimiento, las cuentas activas aparecen primero y resaltadas en Android y web.
-- Las cuentas inactivas se muestran al final con menor contraste, pero continúan disponibles para seleccionarlas cuando sea necesario.
-- La actividad se determina con el saldo actual y el estado visible de la cuenta, siguiendo el mismo criterio de la pestaña Cuentas.
-- El criterio de selección de cuentas Android se trasladó a Kotlin como parte de la modernización gradual.
+- Interfaz disponible en español, inglés, portugués y francés.
+- Tipos de cuenta y categorías editables, con posibilidad de crear opciones nuevas.
+- Selector de cuentas filtrado por tipo, con cuentas activas primero y resaltadas.
+- Al copiar una transacción con fecha actual también se utiliza la hora actual.
+- Transferencias incluidas correctamente como salida de la cuenta de origen y entrada en la cuenta de destino.
+- Estado diario, semanal, mensual, semestral, anual o completo con gráficos más claros y colores diferenciados.
+- Exportación del Estado a un único XLSX con ingresos y gastos juntos.
+- Menú Acerca de con nombre, versión, desarrollador y enlace a los repositorios de Gwr4rd.
+- Compatibilidad conservada con respaldos MMBAK, CSV, JSON y XLSX, además de sincronización mediante Supabase.
 
-## Funciones incluidas
+## Instalación
 
-- Transacciones, cuentas y categorías editables.
-- Búsqueda por cuenta, nota, descripción, fecha, categoría e importe.
-- Estado diario, semanal, mensual, anual o completo.
-- Reportes XLS y XLSX.
-- Importación MMBAK, CSV, JSON y XLSX.
-- Sincronización privada entre Android y web mediante Supabase.
-- Aplicación web responsive preparada para Netlify.
-
-## Instalación Android
-
-1. Descarga `MoneyMateModern-release-signed-v1.4.2.apk`.
+1. Descarga `Control-Financiero-release-signed-v2.0.0.apk`.
 2. Permite la instalación desde el navegador o gestor de archivos.
-3. Abre el APK y confirma la instalación.
+3. Instala la actualización sobre la versión anterior para conservar sus datos locales.
 
 ## Requisitos
 
 - Android 10 o posterior.
-- La sincronización necesita un proyecto de Supabase configurado por el usuario.
+- Para sincronizar, configura tu propio proyecto de Supabase desde el manual integrado.
 
-La aplicación no contiene anuncios. La sincronización solo se activa cuando el usuario configura su propio proyecto de Supabase.
-
-Al actualizar desde una versión anterior a `1.2.0` se debe iniciar sesión una última vez. Desde ese momento la sesión queda guardada y se renueva automáticamente.
+La aplicación no contiene anuncios. El identificador interno se mantiene sin cambios para que Android reconozca esta versión como una actualización compatible.

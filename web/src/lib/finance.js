@@ -8,9 +8,12 @@ export function currency(value, code = "PEN") {
   }).format(value);
 }
 
-export function rangeFor(scope, anchorValue) {
+export function rangeFor(scope, anchorValue, language = "es") {
   const anchor = new Date(`${anchorValue}T12:00:00`);
-  if (scope === "todo") return { start: null, end: null, label: "Todo" };
+  if (scope === "todo") {
+    const label = language === "en" ? "All" : language === "pt" ? "Tudo" : language === "fr" ? "Tout" : "Todo";
+    return { start: null, end: null, label };
+  }
   const start = new Date(anchor);
   const end = new Date(anchor);
   if (scope === "anual") {
@@ -18,18 +21,29 @@ export function rangeFor(scope, anchorValue) {
     end.setMonth(11, 31);
     return { start: iso(start), end: iso(end), label: String(anchor.getFullYear()) };
   }
+  if (scope === "semestral") {
+    const firstMonth = anchor.getMonth() < 6 ? 0 : 6;
+    start.setMonth(firstMonth, 1);
+    end.setMonth(firstMonth + 6, 0);
+    const monthFormatter = new Intl.DateTimeFormat(locale(language), { month: "short" });
+    return {
+      start: iso(start),
+      end: iso(end),
+      label: `${monthFormatter.format(start)} - ${monthFormatter.format(end)} ${anchor.getFullYear()}`,
+    };
+  }
   if (scope === "semanal") {
     const day = start.getDay();
     start.setDate(start.getDate() - (day === 0 ? 6 : day - 1));
     end.setTime(start.getTime() + 6 * MS_DAY);
-    return { start: iso(start), end: iso(end), label: `${shortDate(start)} - ${shortDate(end)}` };
+    return { start: iso(start), end: iso(end), label: `${shortDate(start, language)} - ${shortDate(end, language)}` };
   }
   if (scope === "diario") {
-    return { start: iso(start), end: iso(end), label: longDate(start) };
+    return { start: iso(start), end: iso(end), label: longDate(start, language) };
   }
   start.setDate(1);
   end.setMonth(end.getMonth() + 1, 0);
-  return { start: iso(start), end: iso(end), label: monthLabel(start) };
+  return { start: iso(start), end: iso(end), label: monthLabel(start, language) };
 }
 
 export function inRange(transaction, range) {
@@ -68,6 +82,17 @@ export function summary(transactions) {
   return { income, expense, balance: income - expense };
 }
 
+export function statusSummary(transactions) {
+  let income = 0;
+  let expense = 0;
+  for (const transaction of transactions) {
+    const amount = Number(transaction.amount) || 0;
+    if (transaction.kind === "income" || transaction.kind === "transfer") income += amount;
+    if (transaction.kind === "expense" || transaction.kind === "transfer") expense += amount;
+  }
+  return { income, expense, balance: income - expense };
+}
+
 export function accountBalances(data) {
   const balances = new Map(data.accounts.map((account) => [account.name, Number(account.balance) || 0]));
   for (const transaction of data.transactions) {
@@ -85,8 +110,9 @@ export function accountBalances(data) {
 export function categoryTotals(transactions, kind) {
   const totals = new Map();
   for (const transaction of transactions) {
-    if (transaction.kind !== kind) continue;
-    totals.set(transaction.category, (totals.get(transaction.category) || 0) + Number(transaction.amount));
+    if (transaction.kind !== kind && transaction.kind !== "transfer") continue;
+    const category = transaction.kind === "transfer" ? "Transferencia" : transaction.category;
+    totals.set(category, (totals.get(category) || 0) + Number(transaction.amount));
   }
   return [...totals.entries()]
     .map(([label, value]) => ({ label, value }))
@@ -106,6 +132,33 @@ export function reportRows(transactions) {
   }));
 }
 
+export function statusReportRows(transactions) {
+  return transactions.flatMap((transaction) => {
+    if (transaction.kind !== "transfer") return [{
+      Fecha: transaction.date,
+      Hora: transaction.time,
+      Tipo: transaction.kind === "income" ? "Ingreso" : "Gasto",
+      Cuenta: transaction.account,
+      Categoria: transaction.category,
+      Nota: transaction.note,
+      Descripcion: transaction.description,
+      Importe: Number(transaction.amount),
+    }];
+    const common = {
+      Fecha: transaction.date,
+      Hora: transaction.time,
+      Categoria: "Transferencia",
+      Nota: transaction.note,
+      Descripcion: transaction.description,
+      Importe: Number(transaction.amount),
+    };
+    return [
+      { ...common, Tipo: "Gasto", Cuenta: transaction.account },
+      { ...common, Tipo: "Ingreso", Cuenta: transaction.toAccount },
+    ];
+  });
+}
+
 export function iso(date) {
   return date.toISOString().slice(0, 10);
 }
@@ -114,14 +167,18 @@ export function today() {
   return iso(new Date());
 }
 
-function shortDate(date) {
-  return new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "short" }).format(date);
+function shortDate(date, language) {
+  return new Intl.DateTimeFormat(locale(language), { day: "2-digit", month: "short" }).format(date);
 }
 
-function longDate(date) {
-  return new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "short", year: "numeric" }).format(date);
+function longDate(date, language) {
+  return new Intl.DateTimeFormat(locale(language), { day: "2-digit", month: "short", year: "numeric" }).format(date);
 }
 
-function monthLabel(date) {
-  return new Intl.DateTimeFormat("es-PE", { month: "short", year: "numeric" }).format(date);
+function monthLabel(date, language) {
+  return new Intl.DateTimeFormat(locale(language), { month: "short", year: "numeric" }).format(date);
+}
+
+function locale(language) {
+  return language === "en" ? "en-US" : language === "pt" ? "pt-BR" : language === "fr" ? "fr-FR" : "es-PE";
 }

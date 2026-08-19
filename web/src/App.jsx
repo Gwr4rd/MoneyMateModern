@@ -4,7 +4,10 @@ import { Header, MobileNav, SideNav } from "./components/AppChrome";
 import { AccountsPanel } from "./components/AccountsPanel";
 import {
   AccountDialog,
+  AboutDialog,
   CurrencyDialog,
+  MetadataDialog,
+  LanguageDialog,
   MovementDialog,
   ReportDialog,
   SyncDialog,
@@ -13,13 +16,15 @@ import { Filters } from "./components/Filters";
 import { StatusPanel } from "./components/StatusPanel";
 import { Summary } from "./components/Summary";
 import { TransactionList } from "./components/TransactionList";
-import { seedData, STORAGE_KEY } from "./data";
+import { APP_VERSION, seedData, STORAGE_KEY } from "./data";
+import { t } from "./i18n";
 import {
   accountBalances,
   filterTransactions,
   inRange,
   rangeFor,
   reportRows,
+  statusReportRows,
   summary,
   today,
 } from "./lib/finance";
@@ -38,6 +43,7 @@ export default function App() {
   const [data, setData] = useState(loadData);
   const [active, setActive] = useState("transactions");
   const [dark, setDark] = useState(() => localStorage.getItem("moneymate-theme") === "dark");
+  const [language, setLanguage] = useState(() => localStorage.getItem("moneymate-language") || "es");
   const [filters, setFilters] = useState({ query: "", account: "", anchor: latestDate(data.transactions) });
   const [scope, setScope] = useState("mensual");
   const [statusKind, setStatusKind] = useState("expense");
@@ -59,6 +65,11 @@ export default function App() {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     localStorage.setItem("moneymate-theme", dark ? "dark" : "light");
   }, [dark]);
+
+  useEffect(() => {
+    localStorage.setItem("moneymate-language", language);
+    document.documentElement.lang = language;
+  }, [language]);
 
   useEffect(() => {
     let active = true;
@@ -137,7 +148,7 @@ export default function App() {
     };
   }, [syncUser]);
 
-  const range = useMemo(() => rangeFor(scope, filters.anchor), [scope, filters.anchor]);
+  const range = useMemo(() => rangeFor(scope, filters.anchor, language), [scope, filters.anchor, language]);
   const visibleTransactions = useMemo(
     () => filterTransactions(data.transactions, { ...filters, range }),
     [data.transactions, filters, range],
@@ -174,7 +185,7 @@ export default function App() {
   }
 
   function deleteMovement(transaction) {
-    if (!window.confirm("¿Eliminar este movimiento? Esta accion no se puede deshacer.")) return;
+    if (!window.confirm(t("¿Eliminar este movimiento? Esta accion no se puede deshacer.", language))) return;
     commitData((current) => ({
       ...current,
       transactions: current.transactions.filter((item) => item.id !== transaction.id),
@@ -185,12 +196,13 @@ export default function App() {
     const originalName = account.originalName;
     const duplicate = data.accounts.some((item) => item.name === account.name && item.name !== originalName);
     if (duplicate) {
-      window.alert("Ya existe una cuenta con ese nombre.");
+      window.alert(t("Ya existe una cuenta con ese nombre.", language));
       return;
     }
     commitData((current) => {
       const clean = { ...account };
       delete clean.originalName;
+      delete clean.newType;
       const accounts = originalName
         ? current.accounts.map((item) => item.name === originalName ? clean : item)
         : [...current.accounts, clean];
@@ -201,8 +213,61 @@ export default function App() {
             toAccount: item.toAccount === originalName ? clean.name : item.toAccount,
           }))
         : current.transactions;
-      return { ...current, accounts, transactions };
+      const accountTypes = [...new Set([...(current.accountTypes || []), clean.type])];
+      return { ...current, accountTypes, accounts, transactions };
     });
+  }
+
+  function saveAccountType(original, name) {
+    const clean = name.trim();
+    if (!clean) return;
+    commitData((current) => ({
+      ...current,
+      accountTypes: original
+        ? [...new Set((current.accountTypes || []).map((type) => type === original ? clean : type))]
+        : [...new Set([...(current.accountTypes || []), clean])],
+      accounts: original
+        ? current.accounts.map((account) => account.type === original ? { ...account, type: clean } : account)
+        : current.accounts,
+    }), false);
+  }
+
+  function deleteAccountType(type) {
+    if (data.accounts.some((account) => account.type === type)) {
+      window.alert(t("No se puede eliminar un tipo que tiene cuentas.", language));
+      return;
+    }
+    commitData((current) => ({
+      ...current,
+      accountTypes: (current.accountTypes || []).filter((item) => item !== type),
+    }), false);
+  }
+
+  function saveCategory(original, category) {
+    const duplicate = data.categories.some((item) => item.name === category.name && item.kind === category.kind && item !== original);
+    if (duplicate) return;
+    commitData((current) => ({
+      ...current,
+      categories: original
+        ? current.categories.map((item) => item.name === original.name && item.kind === original.kind ? category : item)
+        : [...current.categories, category],
+      transactions: original && original.name !== category.name
+        ? current.transactions.map((transaction) => transaction.kind === original.kind && transaction.category === original.name
+          ? { ...transaction, category: category.name }
+          : transaction)
+        : current.transactions,
+    }), false);
+  }
+
+  function deleteCategory(category) {
+    if (data.transactions.some((transaction) => transaction.category === category.name && transaction.kind === category.kind)) {
+      window.alert(t("No se puede eliminar una categoria que tiene movimientos.", language));
+      return;
+    }
+    commitData((current) => ({
+      ...current,
+      categories: current.categories.filter((item) => item.name !== category.name || item.kind !== category.kind),
+    }), false);
   }
 
   function toggleAccountHidden(account) {
@@ -213,7 +278,7 @@ export default function App() {
   }
 
   function deleteAccount(account) {
-    if (!window.confirm(`¿Eliminar la cuenta "${account.name}"? Los movimientos historicos conservaran su nombre.`)) return;
+    if (!window.confirm(`${t("Eliminar cuenta", language)} "${account.name}"? ${t("Los movimientos historicos conservaran su nombre.", language)}`)) return;
     commitData((current) => ({
       ...current,
       accounts: current.accounts.filter((item) => item.name !== account.name),
@@ -266,7 +331,7 @@ export default function App() {
   }
 
   async function syncDownload() {
-    if (!window.confirm("La copia de Supabase reemplazara los datos guardados en este navegador.")) return;
+    if (!window.confirm(t("La copia de Supabase reemplazara los datos guardados en este navegador.", language))) return;
     setSyncBusy(true);
     setSyncMessage("");
     syncOperationRef.current = true;
@@ -326,7 +391,7 @@ export default function App() {
   }
 
   async function exportReport(reportScope, anchor, format) {
-    const reportRange = rangeFor(reportScope, anchor);
+    const reportRange = rangeFor(reportScope, anchor, language);
     const rows = data.transactions.filter((transaction) => inRange(transaction, reportRange));
     const XLSX = await import("xlsx");
     const worksheet = XLSX.utils.json_to_sheet(reportRows(rows));
@@ -339,11 +404,22 @@ export default function App() {
     setDialog(null);
   }
 
+  async function exportStatus(reportScope, anchor) {
+    const reportRange = rangeFor(reportScope, anchor, language);
+    const rows = data.transactions.filter((transaction) => inRange(transaction, reportRange));
+    const XLSX = await import("xlsx");
+    const worksheet = XLSX.utils.json_to_sheet(statusReportRows(rows));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Estado");
+    XLSX.writeFile(workbook, `moneymate_estado_${reportScope}_${anchor}.xlsx`);
+  }
+
   return (
     <div className="app-shell">
       <Header
         active={active}
         dark={dark}
+        language={language}
         onNav={navigate}
         onTheme={() => setDark((value) => !value)}
         onCurrency={() => setDialog("currency")}
@@ -351,26 +427,29 @@ export default function App() {
         onNew={() => setDialog("movement")}
         onReport={() => setDialog("report")}
         onSync={() => { setSyncMessage(""); setDialog("sync"); }}
+        onLanguage={() => setDialog("language")}
+        onAbout={() => setDialog("about")}
       />
       <div className="app-body">
-        <SideNav active={active} onChange={navigate} />
+        <SideNav active={active} onChange={navigate} language={language} />
         <main className="main-content">
           {active === "transactions" ? (
             <>
-              <Summary value={summaryValue} currencyCode={data.currency} />
-              <button className="mobile-new" onClick={() => setDialog("movement")}><Plus size={20} /> Nuevo movimiento</button>
+              <Summary value={summaryValue} currencyCode={data.currency} language={language} />
+              <button className="mobile-new" onClick={() => setDialog("movement")}><Plus size={20} /> {t("Nuevo movimiento", language)}</button>
               <div ref={searchRef}>
                 <Filters
                   filters={filters}
                   accounts={data.accounts.filter((account) => !account.hidden)}
                   onChange={setFilters}
                   onClear={() => setFilters({ query: "", account: "", anchor: today() })}
+                  language={language}
                 />
               </div>
               <div className="scope-row">
                 {["anual", "mensual", "semanal", "diario", "todo"].map((value) => (
                   <button className={scope === value ? "active" : ""} onClick={() => setScope(value)} key={value}>
-                    {scopeLabel(value)}
+                    {t(scopeLabel(value), language)}
                   </button>
                 ))}
               </div>
@@ -380,6 +459,7 @@ export default function App() {
                 onEdit={(transaction) => setDialog({ type: "movement", mode: "edit", item: transaction })}
                 onCopy={(transaction) => setDialog({ type: "movement", mode: "copy", item: transaction })}
                 onDelete={deleteMovement}
+                language={language}
               />
             </>
           ) : null}
@@ -391,6 +471,8 @@ export default function App() {
               kind={statusKind}
               onScope={setScope}
               onKind={setStatusKind}
+              onExport={exportStatus}
+              language={language}
             />
           ) : null}
           {active === "accounts" ? (
@@ -401,9 +483,11 @@ export default function App() {
               showHidden={showHiddenAccounts}
               onShowHidden={() => setShowHiddenAccounts((value) => !value)}
               onAdd={() => setDialog({ type: "account" })}
+              onManage={() => setDialog("metadata")}
               onEdit={(account) => setDialog({ type: "account", item: account })}
               onToggleHidden={toggleAccountHidden}
               onDelete={deleteAccount}
+              language={language}
             />
           ) : null}
         </main>
@@ -416,11 +500,12 @@ export default function App() {
             onScope={setScope}
             onKind={setStatusKind}
             compact
+            language={language}
           />
-          <AccountsPanel accounts={accounts} currencyCode={data.currency} />
+          <AccountsPanel accounts={accounts} currencyCode={data.currency} language={language} />
         </aside>
       </div>
-      <MobileNav active={active} onChange={navigate} />
+      <MobileNav active={active} onChange={navigate} language={language} />
       {(dialog === "movement" || dialog?.type === "movement") ? (
         <MovementDialog
           data={data}
@@ -428,6 +513,7 @@ export default function App() {
           mode={dialog?.mode || "new"}
           onClose={() => setDialog(null)}
           onSave={saveMovement}
+          language={language}
         />
       ) : null}
       {dialog?.type === "account" ? (
@@ -436,9 +522,25 @@ export default function App() {
           currencyCode={data.currency}
           onClose={() => setDialog(null)}
           onSave={saveAccount}
+          accountTypes={data.accountTypes}
+          language={language}
         />
       ) : null}
-      {dialog === "currency" ? <CurrencyDialog value={data.currency} onClose={() => setDialog(null)} onSave={saveCurrency} /> : null}
+      {dialog === "metadata" ? (
+        <MetadataDialog
+          accountTypes={data.accountTypes}
+          categories={data.categories}
+          onClose={() => setDialog(null)}
+          onSaveType={saveAccountType}
+          onDeleteType={deleteAccountType}
+          onSaveCategory={saveCategory}
+          onDeleteCategory={deleteCategory}
+          language={language}
+        />
+      ) : null}
+      {dialog === "currency" ? <CurrencyDialog value={data.currency} onClose={() => setDialog(null)} onSave={saveCurrency} language={language} /> : null}
+      {dialog === "language" ? <LanguageDialog value={language} onClose={() => setDialog(null)} onSave={(value) => { setLanguage(value); setDialog(null); }} /> : null}
+      {dialog === "about" ? <AboutDialog version={APP_VERSION} language={language} onClose={() => setDialog(null)} /> : null}
       {dialog === "sync" ? (
         <SyncDialog
           onClose={() => setDialog(null)}
@@ -451,9 +553,10 @@ export default function App() {
           user={syncUser}
           busy={syncBusy}
           message={syncMessage}
+          language={language}
         />
       ) : null}
-      {dialog === "report" ? <ReportDialog onClose={() => setDialog(null)} onExport={exportReport} /> : null}
+      {dialog === "report" ? <ReportDialog onClose={() => setDialog(null)} onExport={exportReport} language={language} /> : null}
     </div>
   );
 }
@@ -468,18 +571,26 @@ function loadData() {
 }
 
 function normalizeSnapshot(snapshot) {
+  const accounts = (Array.isArray(snapshot.accounts) ? snapshot.accounts : []).map((account) => ({
+    name: account.name || "Cuenta",
+    currency: account.currency || snapshot.currency || "PEN",
+    type: account.type?.trim() || "Cuentas de Banco",
+    balance: Number(account.balance) || 0,
+    description: account.description || "",
+    includeTotal: account.includeTotal !== false,
+    hidden: Boolean(account.hidden),
+  }));
+  const accountTypes = [...new Set([
+    "Efectivo",
+    "Cuentas de Banco",
+    ...(Array.isArray(snapshot.accountTypes) ? snapshot.accountTypes : []),
+    ...accounts.map((account) => account.type),
+  ].filter(Boolean))];
   return {
     version: 2,
     currency: snapshot.currency || "PEN",
-    accounts: (Array.isArray(snapshot.accounts) ? snapshot.accounts : []).map((account) => ({
-      name: account.name || "Cuenta",
-      currency: account.currency || snapshot.currency || "PEN",
-      type: account.type === "Efectivo" ? "Efectivo" : "Cuentas de Banco",
-      balance: Number(account.balance) || 0,
-      description: account.description || "",
-      includeTotal: account.includeTotal !== false,
-      hidden: Boolean(account.hidden),
-    })),
+    accountTypes,
+    accounts,
     categories: Array.isArray(snapshot.categories) ? snapshot.categories : [],
     transactions: (Array.isArray(snapshot.transactions) ? snapshot.transactions : [])
       .map((transaction) => ({
@@ -507,5 +618,5 @@ function latestDate(transactions) {
 }
 
 function scopeLabel(scope) {
-  return scope === "anual" ? "Anual" : scope === "semanal" ? "Semanal" : scope === "diario" ? "Diario" : scope === "todo" ? "Todo" : "Mensual";
+  return scope === "anual" ? "Anual" : scope === "semestral" ? "Semestral" : scope === "semanal" ? "Semanal" : scope === "diario" ? "Diario" : scope === "todo" ? "Todo" : "Mensual";
 }

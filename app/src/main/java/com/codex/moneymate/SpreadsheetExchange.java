@@ -102,6 +102,14 @@ final class SpreadsheetExchange {
     }
 
     static void exportXlsx(Context context, Uri uri, List<MoneyDb.Row> transactions, String currencyCode, String sheetTitle) throws Exception {
+        exportXlsx(context, uri, transactions, currencyCode, sheetTitle, false);
+    }
+
+    static void exportStatusXlsx(Context context, Uri uri, List<MoneyDb.Row> transactions, String currencyCode, String sheetTitle) throws Exception {
+        exportXlsx(context, uri, transactions, currencyCode, sheetTitle, true);
+    }
+
+    private static void exportXlsx(Context context, Uri uri, List<MoneyDb.Row> transactions, String currencyCode, String sheetTitle, boolean expandTransfers) throws Exception {
         try (OutputStream raw = context.getContentResolver().openOutputStream(uri)) {
             if (raw == null) throw new IllegalArgumentException("No se pudo guardar el Excel.");
             try (ZipOutputStream zip = new ZipOutputStream(raw)) {
@@ -110,7 +118,7 @@ final class SpreadsheetExchange {
                 writeEntry(zip, "xl/workbook.xml", workbookXml(sheetTitle));
                 writeEntry(zip, "xl/_rels/workbook.xml.rels", workbookRelsXml());
                 writeEntry(zip, "xl/styles.xml", stylesXml());
-                writeEntry(zip, "xl/worksheets/sheet1.xml", sheetXml(transactions, clean(currencyCode, "USD")));
+                writeEntry(zip, "xl/worksheets/sheet1.xml", sheetXml(transactions, clean(currencyCode, "USD"), expandTransfers));
             }
         }
     }
@@ -353,14 +361,19 @@ final class SpreadsheetExchange {
         zip.closeEntry();
     }
 
-    private static String sheetXml(List<MoneyDb.Row> transactions, String currency) {
+    private static String sheetXml(List<MoneyDb.Row> transactions, String currency, boolean expandTransfers) {
         List<String[]> rows = new ArrayList<>();
         rows.add(new String[]{"Fecha", "Cuenta", "Categoría", "Subcategorías", "Nota", currency, "Ingreso/Gasto", "Descripción", "Importe", "Moneda"});
         for (MoneyDb.Row r : transactions) {
             boolean unifiedTransfer = "transfer".equals(r.kind);
-            String kind = unifiedTransfer ? "Transferencia" : (TRANSFER.equals(r.category) && "expense".equals(r.kind) ? "Dinero gastado" : ("income".equals(r.kind) ? "Ingreso" : "Gasto"));
             String date = r.date + "T" + clean(r.time, "00:00") + ":00";
             String amount = String.format(Locale.US, "%.2f", r.amount);
+            if (unifiedTransfer && expandTransfers) {
+                rows.add(new String[]{date, r.transferFrom, TRANSFER, "", r.note, amount, "Gasto", r.description, amount, currency});
+                rows.add(new String[]{date, r.transferTo, TRANSFER, "", r.note, amount, "Ingreso", r.description, amount, currency});
+                continue;
+            }
+            String kind = unifiedTransfer ? "Transferencia" : (TRANSFER.equals(r.category) && "expense".equals(r.kind) ? "Dinero gastado" : ("income".equals(r.kind) ? "Ingreso" : "Gasto"));
             String account = unifiedTransfer ? r.transferFrom : r.account;
             String category = unifiedTransfer ? r.transferTo : r.category;
             rows.add(new String[]{date, account, category, "", r.note, amount, kind, r.description, amount, currency});

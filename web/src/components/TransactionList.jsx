@@ -1,9 +1,10 @@
 import { ArrowRightLeft, CircleDollarSign, Copy, Pencil, ReceiptText, Trash2 } from "lucide-react";
 import { currency } from "../lib/finance";
+import { localeFor, t } from "../i18n";
 
-export function TransactionList({ transactions, currencyCode, onEdit, onCopy, onDelete }) {
+export function TransactionList({ transactions, currencyCode, onEdit, onCopy, onDelete, language }) {
   if (transactions.length === 0) {
-    return <div className="empty-state">No se encontraron transacciones.</div>;
+    return <div className="empty-state">{t("No se encontraron transacciones.", language)}</div>;
   }
   const groups = Object.groupBy
     ? Object.groupBy(transactions, (transaction) => transaction.date)
@@ -16,7 +17,7 @@ export function TransactionList({ transactions, currencyCode, onEdit, onCopy, on
     <div className="transaction-groups">
       {Object.entries(groups).map(([date, rows]) => (
         <section className="transaction-day" key={date}>
-          <h2>{formatDate(date)}</h2>
+          <h2>{formatDate(date, language)}</h2>
           {rows.map((transaction) => (
             <TransactionRow
               transaction={transaction}
@@ -24,6 +25,7 @@ export function TransactionList({ transactions, currencyCode, onEdit, onCopy, on
               onEdit={onEdit}
               onCopy={onCopy}
               onDelete={onDelete}
+              language={language}
               key={transaction.id}
             />
           ))}
@@ -33,11 +35,11 @@ export function TransactionList({ transactions, currencyCode, onEdit, onCopy, on
   );
 }
 
-function TransactionRow({ transaction, currencyCode, onEdit, onCopy, onDelete }) {
+function TransactionRow({ transaction, currencyCode, onEdit, onCopy, onDelete, language }) {
   const transfer = transaction.kind === "transfer";
   const income = transaction.kind === "income";
   const Icon = transfer ? ArrowRightLeft : income ? CircleDollarSign : ReceiptText;
-  const title = transfer ? "Transferencia" : transaction.category;
+  const title = transfer ? t("Transferencia", language) : t(transaction.category, language);
   const accountMeta = transfer
     ? `${transaction.account} → ${transaction.toAccount}`
     : transaction.account;
@@ -53,16 +55,16 @@ function TransactionRow({ transaction, currencyCode, onEdit, onCopy, onDelete })
       <time>{transaction.time}</time>
       <strong className="transaction-amount">{currency(transaction.amount, currencyCode)}</strong>
       <div className="transaction-actions">
-        <button onClick={() => onCopy(transaction)} title="Copiar movimiento" aria-label="Copiar movimiento"><Copy size={17} /></button>
-        <button onClick={() => onEdit(transaction)} title="Editar movimiento" aria-label="Editar movimiento"><Pencil size={17} /></button>
-        <button className="danger" onClick={() => onDelete(transaction)} title="Eliminar movimiento" aria-label="Eliminar movimiento"><Trash2 size={17} /></button>
+        <button onClick={() => onCopy(transaction)} title={t("Copiar movimiento", language)} aria-label={t("Copiar movimiento", language)}><Copy size={17} /></button>
+        <button onClick={() => onEdit(transaction)} title={t("Editar movimiento", language)} aria-label={t("Editar movimiento", language)}><Pencil size={17} /></button>
+        <button className="danger" onClick={() => onDelete(transaction)} title={t("Eliminar movimiento", language)} aria-label={t("Eliminar movimiento", language)}><Trash2 size={17} /></button>
       </div>
     </article>
   );
 }
 
-function formatDate(value) {
-  return new Intl.DateTimeFormat("es-PE", {
+function formatDate(value, language) {
+  return new Intl.DateTimeFormat(localeFor(language), {
     day: "numeric",
     month: "long",
     year: "numeric",

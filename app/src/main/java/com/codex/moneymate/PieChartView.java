@@ -15,12 +15,14 @@ final class PieChartView extends View {
     private final List<MoneyDb.Bar> data = new ArrayList<>();
     private int textColor = Color.WHITE;
     private final int[] colors = new int[]{
-            Color.rgb(244, 84, 94),
-            Color.rgb(245, 152, 83),
-            Color.rgb(248, 205, 82),
-            Color.rgb(76, 160, 124),
-            Color.rgb(86, 132, 210),
-            Color.rgb(160, 112, 210)
+            Color.rgb(255, 59, 92),
+            Color.rgb(255, 138, 52),
+            Color.rgb(255, 202, 40),
+            Color.rgb(0, 184, 148),
+            Color.rgb(0, 168, 232),
+            Color.rgb(61, 90, 254),
+            Color.rgb(168, 85, 247),
+            Color.rgb(236, 72, 153)
     };
 
     PieChartView(Context context) {
@@ -43,62 +45,34 @@ final class PieChartView extends View {
         super.onDraw(canvas);
         double total = 0;
         for (MoneyDb.Bar b : data) total += b.value;
-        int size = Math.min(getWidth(), getHeight()) - 92;
-        int left = (getWidth() - size) / 2;
-        int top = (getHeight() - size) / 2;
+        float padding = Math.max(18f, Math.min(getWidth(), getHeight()) * 0.08f);
+        float size = Math.max(1f, Math.min(getWidth(), getHeight()) - padding * 2f);
+        float left = (getWidth() - size) / 2f;
+        float top = (getHeight() - size) / 2f;
         RectF rect = new RectF(left, top, left + size, top + size);
-        if (total <= 0) {
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(18);
-            paint.setColor(Color.rgb(70, 74, 80));
-            canvas.drawOval(rect, paint);
-            return;
-        }
-        paint.setStyle(Paint.Style.FILL);
-        float start = -90;
+        float stroke = Math.max(24f, size * 0.22f);
+
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(stroke);
+        paint.setStrokeCap(Paint.Cap.BUTT);
+        paint.setColor(Color.argb(38, Color.red(textColor), Color.green(textColor), Color.blue(textColor)));
+        canvas.drawArc(rect, -90, 360, false, paint);
+        if (total <= 0) return;
+
+        float start = -90f;
         for (int i = 0; i < data.size(); i++) {
             float sweep = (float) (360d * data.get(i).value / total);
             paint.setColor(colors[i % colors.length]);
-            canvas.drawArc(rect, start, sweep, true, paint);
+            canvas.drawArc(rect, start, Math.max(0f, sweep - 1.2f), false, paint);
             start += sweep;
         }
-        drawLabels(canvas, rect, total);
-    }
 
-    private void drawLabels(Canvas canvas, RectF rect, double total) {
-        float cx = rect.centerX();
-        float cy = rect.centerY();
-        float radius = rect.width() / 2f;
-        paint.setStrokeWidth(2);
-        paint.setTextSize(28);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setColor(textColor);
+        paint.setTextSize(Math.max(18f, size * 0.075f));
         paint.setFakeBoldText(true);
-        float start = -90;
-        for (int i = 0; i < data.size() && i < 5; i++) {
-            MoneyDb.Bar item = data.get(i);
-            float sweep = (float) (360d * item.value / total);
-            if (sweep < 10) {
-                start += sweep;
-                continue;
-            }
-            float angle = (float) Math.toRadians(start + sweep / 2f);
-            float x1 = cx + (float) Math.cos(angle) * radius * 0.92f;
-            float y1 = cy + (float) Math.sin(angle) * radius * 0.92f;
-            float x2 = cx + (float) Math.cos(angle) * radius * 1.16f;
-            float y2 = cy + (float) Math.sin(angle) * radius * 1.16f;
-            boolean right = Math.cos(angle) >= 0;
-            float x3 = right ? Math.min(getWidth() - 8, x2 + 32) : Math.max(8, x2 - 32);
-            paint.setColor(colors[i % colors.length]);
-            canvas.drawLine(x1, y1, x2, y2, paint);
-            canvas.drawLine(x2, y2, x3, y2, paint);
-            paint.setColor(textColor);
-            paint.setTextAlign(right ? Paint.Align.LEFT : Paint.Align.RIGHT);
-            String name = item.label.length() > 14 ? item.label.substring(0, 14) : item.label;
-            canvas.drawText(name, x3, y2 - 4, paint);
-            paint.setFakeBoldText(false);
-            canvas.drawText(Math.round(100d * item.value / total) + "%", x3, y2 + 26, paint);
-            paint.setFakeBoldText(true);
-            start += sweep;
-        }
+        canvas.drawText("100%", rect.centerX(), rect.centerY() + paint.getTextSize() * 0.15f, paint);
         paint.setFakeBoldText(false);
     }
 }

@@ -4,6 +4,7 @@ import kotlin.math.abs
 
 data class AccountSelectionOption(
     @JvmField val name: String,
+    @JvmField val type: String,
     @JvmField val active: Boolean,
 ) {
     override fun toString(): String = name

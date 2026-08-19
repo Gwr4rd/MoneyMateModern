@@ -539,6 +539,34 @@ select:focus-visible {
   font-weight: 700;
 }
 
+.section-actions,
+.status-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-secondary,
+.status-export {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--control);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-export {
+  color: var(--green);
+}
+
 .status-panel {
   padding: 16px;
   border: 1px solid var(--border);
@@ -560,7 +588,7 @@ select:focus-visible {
 
 .scope-tabs {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 2px;
   margin-bottom: 18px;
   padding: 3px;
@@ -633,6 +661,12 @@ select:focus-visible {
   font-size: 12px;
 }
 
+.legend-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
 .legend-row i {
   width: 8px;
   height: 8px;
@@ -649,6 +683,146 @@ select:focus-visible {
   padding: 36px 12px;
   color: var(--muted);
   text-align: center;
+}
+
+.metadata-form {
+  display: grid;
+  gap: 22px;
+  padding: 18px;
+}
+
+.metadata-form section + section {
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.metadata-form h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.metadata-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.metadata-add.category-add {
+  grid-template-columns: minmax(0, 1fr) 96px auto;
+}
+
+.metadata-add input,
+.metadata-add select {
+  min-width: 0;
+  height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--control);
+  color: var(--text);
+}
+
+.metadata-add button,
+.metadata-list button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.metadata-list > div {
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 38px;
+  align-items: center;
+  gap: 7px;
+  border-bottom: 1px solid var(--border);
+}
+
+.metadata-list > div.category-metadata-row {
+  grid-template-columns: minmax(0, 1fr) 88px auto 38px;
+}
+
+.category-metadata-row select {
+  height: 32px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--control);
+  color: var(--text);
+  font-size: 11px;
+}
+
+.language-options,
+.about-dialog {
+  display: grid;
+  gap: 9px;
+  padding: 18px;
+}
+
+.language-options > button:not(.dialog-primary) {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--control);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.language-options > button.active {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green);
+  font-weight: 700;
+}
+
+.about-dialog {
+  justify-items: center;
+  text-align: center;
+}
+
+.about-dialog img {
+  width: 92px;
+  height: 92px;
+  object-fit: contain;
+}
+
+.about-dialog h3,
+.about-dialog p {
+  margin: 0;
+}
+
+.metadata-list span,
+.metadata-list small {
+  display: block;
+}
+
+.metadata-list small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.metadata-list button {
+  height: 32px;
+  padding: 0 9px;
+}
+
+.metadata-list button.danger {
+  padding: 0;
+  color: var(--red);
 }
 
 .accounts-panel {
@@ -1416,7 +1590,7 @@ select:focus-visible {
 
   .scope-tabs {
     overflow-x: auto;
-    grid-template-columns: repeat(5, minmax(66px, 1fr));
+    grid-template-columns: repeat(6, minmax(72px, 1fr));
   }
 
   .chart-layout {
@@ -1443,6 +1617,25 @@ select:focus-visible {
   .section-primary {
     min-width: 118px;
     padding: 0 9px;
+  }
+
+  .section-heading {
+    align-items: flex-start;
+  }
+
+  .section-actions,
+  .status-heading-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .metadata-add.category-add {
+    grid-template-columns: minmax(0, 1fr) 92px;
+  }
+
+  .metadata-add.category-add button {
+    grid-column: 1 / -1;
+    min-height: 40px;
   }
 
   .currency-options {

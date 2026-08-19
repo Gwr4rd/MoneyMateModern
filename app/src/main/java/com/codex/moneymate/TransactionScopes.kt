@@ -12,12 +12,30 @@ data class TransactionRange(
 
 object TransactionScopes {
     private val storageFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-    private val shortFormat = SimpleDateFormat("dd MMM", Locale("es", "PE"))
-    private val longFormat = SimpleDateFormat("dd MMM yyyy", Locale("es", "PE"))
-
     @JvmStatic
     fun range(scope: String, anchorValue: String?, fallbackValue: String): TransactionRange {
-        if (scope == "todo" || scope == "total") return TransactionRange(null, null, "Todo")
+        return range(scope, anchorValue, fallbackValue, "es")
+    }
+
+    @JvmStatic
+    fun range(scope: String, anchorValue: String?, fallbackValue: String, language: String): TransactionRange {
+        if (scope == "todo" || scope == "total") {
+            val label = when (language) {
+                "en" -> "All"
+                "pt" -> "Tudo"
+                "fr" -> "Tout"
+                else -> "Todo"
+            }
+            return TransactionRange(null, null, label)
+        }
+        val locale = when (language) {
+            "en" -> Locale.US
+            "pt" -> Locale("pt", "BR")
+            "fr" -> Locale.FRANCE
+            else -> Locale("es", "PE")
+        }
+        val shortFormat = SimpleDateFormat("dd MMM", locale)
+        val longFormat = SimpleDateFormat("dd MMM yyyy", locale)
         val anchor = parse(anchorValue ?: fallbackValue)
         val start = anchor.clone() as Calendar
         var end = anchor.clone() as Calendar
@@ -44,7 +62,7 @@ object TransactionScopes {
             else -> {
                 start.set(Calendar.DAY_OF_MONTH, 1)
                 end.set(Calendar.DAY_OF_MONTH, end.getActualMaximum(Calendar.DAY_OF_MONTH))
-                SimpleDateFormat("MMM yyyy", Locale("es", "PE")).format(anchor.time)
+                SimpleDateFormat("MMM yyyy", locale).format(anchor.time)
             }
         }
         return TransactionRange(storageFormat.format(start.time), storageFormat.format(end.time), label)

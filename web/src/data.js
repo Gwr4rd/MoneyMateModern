@@ -1,8 +1,10 @@
 export const STORAGE_KEY = "moneymate-modern-v2";
+export const APP_VERSION = "2.0.0";
 
 export const seedData = {
   version: 2,
   currency: "PEN",
+  accountTypes: ["Efectivo", "Cuentas de Banco"],
   accounts: [
     { name: "Efectivo", currency: "PEN", type: "Efectivo", balance: 250, description: "", includeTotal: true, hidden: false },
     { name: "Cuenta principal", currency: "PEN", type: "Cuentas de Banco", balance: 800, description: "", includeTotal: true, hidden: false },

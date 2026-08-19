@@ -1,23 +1,26 @@
-# MoneyMate Modern
+# Control Financiero
 
 Aplicacion de finanzas personales sin anuncios para Android 10 o superior, acompañada por una aplicacion web responsive.
 
 ## Funciones principales
 
 - `Transacciones`, `Estado` y `Cuentas` con interfaz clara y modo oscuro mate.
+- Interfaz traducible a español, inglés, portugués y francés.
 - Icono del cerdito en el lanzador y en la web.
 - Gastos, ingresos y transferencias editables y copiables.
 - Transferencias agrupadas visualmente en una sola fila, con texto azul y sin sombreado.
 - Busqueda por cuenta, categoria, notas, descripcion, fechas, tipo e importe.
-- Estado diario, semanal, mensual, anual o completo con graficas animadas.
-- Cuentas separadas en `Efectivo` y `Cuentas de Banco`.
-- Cuentas y categorias personalizables, ocultables y recuperables.
+- Estado diario, semanal, mensual, semestral, anual o completo con graficas animadas.
+- Exportacion de ingresos y gastos juntos en un unico archivo XLSX desde Estado.
+- Cuentas organizadas por tipos editables, incluidos `Efectivo` y `Cuentas de Banco`.
+- Tipos de cuenta, cuentas y categorias personalizables, ocultables y recuperables.
 - Monedas por pais, incluido Sol peruano (`PEN`, `S/`).
 - Importacion y exportacion MMBAK, CSV, JSON y XLSX.
 - Reportes XLS y XLSX por semana, mes, año o todo.
 - Sincronizacion opcional Android/web con sesion persistente y renovación segura del acceso.
 - Sincronizacion automatica al modificar datos y comprobacion periodica de cambios en la nube.
 - Manual de Supabase integrado con el script SQL listo para copiar.
+- Seccion Acerca de con version, desarrollador y enlace a los repositorios de Gwr4rd.
 - Deduplicacion de cuentas por nombre al importar y al actualizar bases existentes.
 
 ## Compatibilidad de datos

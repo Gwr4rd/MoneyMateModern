@@ -4,6 +4,8 @@ import {
   CloudMoon,
   FileSpreadsheet,
   ListTree,
+  Languages,
+  Info,
   MoreVertical,
   Plus,
   RefreshCw,
@@ -11,6 +13,7 @@ import {
   Sun,
   WalletCards,
 } from "lucide-react";
+import { t } from "../i18n";
 
 const navItems = [
   { id: "transactions", label: "Transacciones", icon: ListTree },
@@ -18,37 +21,45 @@ const navItems = [
   { id: "accounts", label: "Cuentas", icon: WalletCards },
 ];
 
-export function Header({ active, dark, onNav, onTheme, onCurrency, onSearch, onNew, onReport, onSync }) {
+export function Header({ active, dark, language, onNav, onTheme, onCurrency, onSearch, onNew, onReport, onSync, onLanguage, onAbout }) {
+  const mobileAction = (action) => (event) => {
+    event.currentTarget.closest("details")?.removeAttribute("open");
+    action();
+  };
   return (
     <header className="app-header">
       <div className="brand">
         <img src="/pig.png" alt="" />
-        <strong>MoneyMate Modern</strong>
+        <strong>Control Financiero</strong>
       </div>
-      <nav className="desktop-top-nav" aria-label="Navegacion principal">
+      <nav className="desktop-top-nav" aria-label={t("Navegacion principal", language)}>
         {navItems.map(({ id, label }) => (
-          <button className={active === id ? "active" : ""} onClick={() => onNav(id)} key={id}>{label}</button>
+          <button className={active === id ? "active" : ""} onClick={() => onNav(id)} key={id}>{t(label, language)}</button>
         ))}
       </nav>
       <div className="header-actions">
-        <IconAction icon={Search} label="Buscar" onClick={onSearch} />
+        <IconAction icon={Search} label={t("Buscar", language)} onClick={onSearch} />
         <button className="primary-action" onClick={onNew}>
           <Plus size={19} />
-          <span>Nuevo movimiento</span>
+          <span>{t("Nuevo movimiento", language)}</span>
         </button>
-        <IconAction className="desktop-action" icon={FileSpreadsheet} label="Reporte" onClick={onReport} />
-        <IconAction className="desktop-action" icon={RefreshCw} label="Sincronizar" onClick={onSync} />
-        <IconAction className="desktop-action" icon={Banknote} label="Moneda" onClick={onCurrency} />
-        <button className="icon-only desktop-theme" onClick={onTheme} title={dark ? "Modo claro" : "Modo oscuro"} aria-label={dark ? "Modo claro" : "Modo oscuro"}>
+        <IconAction className="desktop-action" icon={FileSpreadsheet} label={t("Reporte", language)} onClick={onReport} />
+        <IconAction className="desktop-action" icon={RefreshCw} label={t("Sincronizar", language)} onClick={onSync} />
+        <IconAction className="desktop-action" icon={Banknote} label={t("Moneda", language)} onClick={onCurrency} />
+        <IconAction className="desktop-action" icon={Languages} label={t("Idioma", language)} onClick={onLanguage} />
+        <IconAction className="desktop-action" icon={Info} label={t("Acerca de", language)} onClick={onAbout} />
+        <button className="icon-only desktop-theme" onClick={onTheme} title={t(dark ? "Modo claro" : "Modo oscuro", language)} aria-label={t(dark ? "Modo claro" : "Modo oscuro", language)}>
           {dark ? <Sun size={21} /> : <CloudMoon size={22} />}
         </button>
         <details className="mobile-overflow">
-          <summary aria-label="Abrir menu"><MoreVertical size={25} /></summary>
+          <summary aria-label={t("Abrir menu", language)}><MoreVertical size={25} /></summary>
           <div>
-            <button onClick={onTheme}>{dark ? <Sun size={20} /> : <CloudMoon size={20} />} {dark ? "Modo claro" : "Modo oscuro"}</button>
-            <button onClick={onCurrency}><Banknote size={20} /> Moneda y pais</button>
-            <button onClick={onReport}><FileSpreadsheet size={20} /> Generar reporte</button>
-            <button onClick={onSync}><RefreshCw size={20} /> Sincronizar</button>
+            <button onClick={mobileAction(onTheme)}>{dark ? <Sun size={20} /> : <CloudMoon size={20} />} {t(dark ? "Modo claro" : "Modo oscuro", language)}</button>
+            <button onClick={mobileAction(onCurrency)}><Banknote size={20} /> {t("Moneda y pais", language)}</button>
+            <button onClick={mobileAction(onLanguage)}><Languages size={20} /> {t("Idioma", language)}</button>
+            <button onClick={mobileAction(onReport)}><FileSpreadsheet size={20} /> {t("Generar reporte", language)}</button>
+            <button onClick={mobileAction(onSync)}><RefreshCw size={20} /> {t("Sincronizar", language)}</button>
+            <button onClick={mobileAction(onAbout)}><Info size={20} /> {t("Acerca de", language)}</button>
           </div>
         </details>
       </div>
@@ -56,26 +67,26 @@ export function Header({ active, dark, onNav, onTheme, onCurrency, onSearch, onN
   );
 }
 
-export function SideNav({ active, onChange }) {
+export function SideNav({ active, onChange, language }) {
   return (
     <aside className="side-nav">
       {navItems.map(({ id, label, icon: Icon }) => (
         <button className={active === id ? "active" : ""} onClick={() => onChange(id)} key={id}>
           <Icon size={22} />
-          <span>{label}</span>
+          <span>{t(label, language)}</span>
         </button>
       ))}
     </aside>
   );
 }
 
-export function MobileNav({ active, onChange }) {
+export function MobileNav({ active, onChange, language }) {
   return (
-    <nav className="mobile-nav" aria-label="Navegacion principal">
+    <nav className="mobile-nav" aria-label={t("Navegacion principal", language)}>
       {navItems.map(({ id, label, icon: Icon }) => (
         <button className={active === id ? "active" : ""} onClick={() => onChange(id)} key={id}>
           <Icon size={24} />
-          <span>{label}</span>
+          <span>{t(label, language)}</span>
         </button>
       ))}
     </nav>

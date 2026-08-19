@@ -20,7 +20,7 @@ import java.util.UUID;
 
 final class MoneyDb extends SQLiteOpenHelper {
     static final String DB_NAME = "moneymate.sqlite";
-    private static final int VERSION = 7;
+    private static final int VERSION = 8;
 
     MoneyDb(Context context) {
         super(context, DB_NAME, null, VERSION);
@@ -29,6 +29,7 @@ final class MoneyDb extends SQLiteOpenHelper {
     @Override
     public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE accounts(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, balance REAL NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'USD', type TEXT NOT NULL DEFAULT 'Cuentas de Banco', description TEXT, include_total INTEGER NOT NULL DEFAULT 1, hidden INTEGER NOT NULL DEFAULT 0)");
+        db.execSQL("CREATE TABLE account_types(name TEXT PRIMARY KEY COLLATE NOCASE)");
         db.execSQL("CREATE TABLE categories(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, kind TEXT NOT NULL, color TEXT NOT NULL DEFAULT '#0E8F70')");
         db.execSQL("CREATE TABLE transactions(id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL, time TEXT NOT NULL DEFAULT '00:00', account TEXT NOT NULL, category TEXT NOT NULL, kind TEXT NOT NULL, amount REAL NOT NULL, note TEXT, description TEXT, transfer_ref TEXT)");
         db.execSQL("CREATE TABLE budgets(id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT NOT NULL, month TEXT NOT NULL, amount REAL NOT NULL)");
@@ -63,9 +64,13 @@ final class MoneyDb extends SQLiteOpenHelper {
         if (oldVersion < 7) {
             dedupeAccounts(db);
         }
+        if (oldVersion < 8) {
+            ensureAccountTypes(db);
+        }
     }
 
     void seed(SQLiteDatabase db) {
+        seedAccountTypes(db);
         db.execSQL("INSERT INTO accounts(name,balance,currency,type,description,include_total,hidden) VALUES('Efectivo',0,'USD','Efectivo','',1,0),('Cuenta',0,'USD','Cuentas de Banco','',1,0)");
         db.execSQL("INSERT INTO categories(name,kind,color) VALUES('Comida','expense','#D94A4A'),('Transporte','expense','#DB8A35'),('Hogar','expense','#4067B2'),('Salario','income','#168A5A')");
     }
@@ -120,6 +125,42 @@ final class MoneyDb extends SQLiteOpenHelper {
             while (c.moveToNext()) out.add(new AccountOption(c.getLong(0), c.getString(1), c.getString(2), c.getDouble(4), c.getString(3), c.getString(5), c.getInt(6) == 1, c.getInt(7) == 1));
         }
         return out;
+    }
+
+    List<String> accountTypes() {
+        ensureAccountTypes(getWritableDatabase());
+        return strings("SELECT name FROM account_types ORDER BY CASE WHEN name='Efectivo' THEN 0 WHEN name='Cuentas de Banco' THEN 1 ELSE 2 END,name COLLATE NOCASE", "name");
+    }
+
+    void addAccountType(String name) {
+        String clean = cleanAccountType(name);
+        if (clean.isEmpty()) return;
+        getWritableDatabase().execSQL("INSERT OR IGNORE INTO account_types(name) VALUES(?)", new Object[]{clean});
+    }
+
+    void updateAccountType(String oldName, String newName) {
+        String clean = cleanAccountType(newName);
+        if (clean.isEmpty() || oldName.equals(clean)) return;
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            db.execSQL("INSERT OR IGNORE INTO account_types(name) VALUES(?)", new Object[]{clean});
+            db.execSQL("UPDATE accounts SET type=? WHERE type=?", new Object[]{clean, oldName});
+            db.delete("account_types", "name=?", new String[]{oldName});
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    boolean deleteAccountType(String name) {
+        if ("Efectivo".equalsIgnoreCase(name) || "Cuentas de Banco".equalsIgnoreCase(name)) return false;
+        SQLiteDatabase db = getWritableDatabase();
+        try (Cursor c = db.rawQuery("SELECT 1 FROM accounts WHERE type=? LIMIT 1", new String[]{name})) {
+            if (c.moveToFirst()) return false;
+        }
+        db.delete("account_types", "name=?", new String[]{name});
+        return true;
     }
 
     String primaryCurrency() {
@@ -298,7 +339,7 @@ final class MoneyDb extends SQLiteOpenHelper {
     List<Bar> categoryTotalsBetween(String kind, String startDate, String endDate) {
         SQLiteDatabase db = getReadableDatabase();
         List<Bar> rows = new ArrayList<>();
-        String sql = "SELECT category,SUM(amount) FROM transactions WHERE kind=? AND category<>'Transferencia'";
+        String sql = "SELECT category,SUM(amount) FROM transactions WHERE kind=?";
         List<String> args = new ArrayList<>();
         args.add(kind);
         if (startDate != null && endDate != null) {
@@ -390,8 +431,10 @@ final class MoneyDb extends SQLiteOpenHelper {
 
     void addAccount(String name, String currency, String type, double balance, String description, boolean includeTotal, boolean hidden) {
         SQLiteDatabase db = getWritableDatabase();
+        String normalizedType = accountType(type, name);
+        db.execSQL("INSERT OR IGNORE INTO account_types(name) VALUES(?)", new Object[]{normalizedType});
         db.execSQL("INSERT INTO accounts(name,balance,currency,type,description,include_total,hidden) VALUES(?,?,?,?,?,?,?)",
-                new Object[]{name, balance, currency, accountType(type, name), description, includeTotal ? 1 : 0, hidden ? 1 : 0});
+                new Object[]{name, balance, currency, normalizedType, description, includeTotal ? 1 : 0, hidden ? 1 : 0});
         dedupeAccounts(db);
     }
 
@@ -403,8 +446,10 @@ final class MoneyDb extends SQLiteOpenHelper {
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
+            String normalizedType = accountType(type, newName);
+            db.execSQL("INSERT OR IGNORE INTO account_types(name) VALUES(?)", new Object[]{normalizedType});
             db.execSQL("UPDATE accounts SET name=?,currency=?,type=?,balance=?,description=?,include_total=?,hidden=? WHERE id=?",
-                    new Object[]{newName, currency, accountType(type, newName), balance, description, includeTotal ? 1 : 0, hidden ? 1 : 0, id});
+                    new Object[]{newName, currency, normalizedType, balance, description, includeTotal ? 1 : 0, hidden ? 1 : 0, id});
             if (!oldName.equals(newName)) {
                 db.execSQL("UPDATE transactions SET account=? WHERE account=?", new Object[]{newName, oldName});
             }
@@ -461,11 +506,15 @@ final class MoneyDb extends SQLiteOpenHelper {
         db.beginTransaction();
         try {
             db.delete("accounts", null, null);
+            db.delete("account_types", null, null);
             db.delete("categories", null, null);
             db.delete("transactions", null, null);
+            seedAccountTypes(db);
             if (accounts.isEmpty()) seedAccountsOnly(db);
             for (ImportedAccount a : accounts) {
-                db.execSQL("INSERT INTO accounts(name,balance,currency,type,description,include_total,hidden) VALUES(?,?,?,?,?,?,?)", new Object[]{a.name, a.balance, a.currency, accountType(a.type, a.name), a.description, a.includeTotal ? 1 : 0, a.hidden ? 1 : 0});
+                String normalizedType = accountType(a.type, a.name);
+                db.execSQL("INSERT OR IGNORE INTO account_types(name) VALUES(?)", new Object[]{normalizedType});
+                db.execSQL("INSERT INTO accounts(name,balance,currency,type,description,include_total,hidden) VALUES(?,?,?,?,?,?,?)", new Object[]{a.name, a.balance, a.currency, normalizedType, a.description, a.includeTotal ? 1 : 0, a.hidden ? 1 : 0});
             }
             if (categories.isEmpty()) seedCategoriesOnly(db);
             for (ImportedCategory c : categories) {
@@ -544,6 +593,7 @@ final class MoneyDb extends SQLiteOpenHelper {
     }
 
     private void seedAccountsOnly(SQLiteDatabase db) {
+        seedAccountTypes(db);
         db.execSQL("INSERT INTO accounts(name,balance,currency,type,description,include_total,hidden) VALUES('Efectivo',0,'USD','Efectivo','',1,0),('Cuenta',0,'USD','Cuentas de Banco','',1,0)");
     }
 
@@ -559,9 +609,25 @@ final class MoneyDb extends SQLiteOpenHelper {
     }
 
     private String accountType(String type, String name) {
-        String value = type == null ? "" : type.trim();
-        if (isCashLike(name) || value.toLowerCase(java.util.Locale.US).contains("efectivo") || value.toLowerCase(java.util.Locale.US).contains("cash")) return "Efectivo";
-        return "Cuentas de Banco";
+        String value = cleanAccountType(type);
+        String lower = value.toLowerCase(java.util.Locale.US);
+        if (lower.equals("cuentas") || lower.equals("banco") || lower.equals("bank")) return "Cuentas de Banco";
+        if (isCashLike(name) || lower.equals("efectivo") || lower.equals("cash")) return "Efectivo";
+        return value.isEmpty() ? "Cuentas de Banco" : value;
+    }
+
+    private String cleanAccountType(String type) {
+        return type == null ? "" : type.trim();
+    }
+
+    private void seedAccountTypes(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS account_types(name TEXT PRIMARY KEY COLLATE NOCASE)");
+        db.execSQL("INSERT OR IGNORE INTO account_types(name) VALUES('Efectivo'),('Cuentas de Banco')");
+    }
+
+    private void ensureAccountTypes(SQLiteDatabase db) {
+        seedAccountTypes(db);
+        db.execSQL("INSERT OR IGNORE INTO account_types(name) SELECT DISTINCT trim(type) FROM accounts WHERE type IS NOT NULL AND trim(type)<>''");
     }
 
     private void normalizeAccountGroups(SQLiteDatabase db) {
@@ -630,7 +696,7 @@ final class MoneyDb extends SQLiteOpenHelper {
     }
 
     private double sumBetween(SQLiteDatabase db, String kind, String startDate, String endDate) {
-        String sql = "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE kind=? AND category<>'Transferencia'";
+        String sql = "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE kind=?";
         List<String> args = new ArrayList<>();
         args.add(kind);
         if (startDate != null && endDate != null) {
