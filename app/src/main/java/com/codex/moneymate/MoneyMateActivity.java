@@ -177,7 +177,7 @@ public class MoneyMateActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(bg);
-        root.setPadding(dp(10), dp(8), dp(10), dp(6));
+        root.setPadding(dp(14), dp(4), dp(14), dp(8));
 
         root.addView(topBar());
 
@@ -189,16 +189,16 @@ public class MoneyMateActivity extends Activity {
 
         LinearLayout navShell = new LinearLayout(this);
         navShell.setOrientation(LinearLayout.VERTICAL);
-        navShell.setPadding(dp(5), dp(4), dp(5), dp(4));
-        navShell.setBackground(rounded(surface, 30, 0, strokeColor));
+        navShell.setPadding(dp(5), dp(3), dp(5), dp(3));
+        navShell.setBackground(rounded(surface, 26, 0, strokeColor));
         navShell.setElevation(0);
-        navShell.setLayoutParams(margins(-1, -2, 8, 0));
+        navShell.setLayoutParams(margins(-1, -2, 2, 0));
         LinearLayout nav = new LinearLayout(this);
         nav.setGravity(Gravity.CENTER);
         nav.setOrientation(LinearLayout.HORIZONTAL);
-        nav.addView(tab("Transacciones", "trans", R.drawable.ic_nav_register), new LinearLayout.LayoutParams(0, dp(52), 1));
-        nav.addView(tab("Estado", "stats", R.drawable.ic_nav_status), new LinearLayout.LayoutParams(0, dp(52), 1));
-        nav.addView(tab("Cuentas", "accounts", R.drawable.ic_nav_accounts), new LinearLayout.LayoutParams(0, dp(52), 1));
+        nav.addView(tab("Transacciones", "trans", R.drawable.ic_nav_register), new LinearLayout.LayoutParams(0, dp(56), 1));
+        nav.addView(tab("Estado", "stats", R.drawable.ic_nav_status), new LinearLayout.LayoutParams(0, dp(56), 1));
+        nav.addView(tab("Cuentas", "accounts", R.drawable.ic_nav_accounts), new LinearLayout.LayoutParams(0, dp(56), 1));
         navShell.addView(nav);
         root.addView(navShell);
         setContentView(root);
@@ -209,22 +209,22 @@ public class MoneyMateActivity extends Activity {
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setPadding(dp(6), dp(4), dp(4), dp(4));
-        top.setBackground(rounded(topSurface, 16, 0, strokeColor));
+        top.setPadding(0, dp(2), 0, dp(2));
+        top.setBackgroundColor(Color.TRANSPARENT);
         top.setElevation(0);
-        top.setLayoutParams(margins(-1, dp(64), 0, 10));
+        top.setLayoutParams(margins(-1, dp(58), 0, 8));
 
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.app_pig);
         logo.setAdjustViewBounds(true);
         logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        top.addView(logo, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        top.addView(logo, new LinearLayout.LayoutParams(dp(38), dp(38)));
 
         String subtitle;
         if ("stats".equals(screen)) subtitle = titleForScreen() + " · " + statsRange().label;
         else if ("trans".equals(screen)) subtitle = titleForScreen() + " · " + transactionRangeLabel();
         else subtitle = titleForScreen() + " · " + monthLabel(period);
-        TextView title = text("", 19, true, textColor);
+        TextView title = text("", 18, true, textColor);
         title.setText(appHeaderText("Control Financiero", ui(subtitle)));
         title.setGravity(Gravity.CENTER);
         title.setOnClickListener(v -> {
@@ -232,8 +232,8 @@ public class MoneyMateActivity extends Activity {
             else if ("trans".equals(screen)) transactionDateDialog();
             else monthDialog();
         });
-        top.addView(title, new LinearLayout.LayoutParams(0, dp(52), 1));
-        top.addView(topIcon("⋮", v -> menuDialog(v)), new LinearLayout.LayoutParams(dp(50), dp(50)));
+        top.addView(title, new LinearLayout.LayoutParams(0, dp(50), 1));
+        top.addView(topIcon("⋮", v -> menuDialog(v)), new LinearLayout.LayoutParams(dp(44), dp(48)));
         return top;
     }
 
@@ -265,34 +265,34 @@ public class MoneyMateActivity extends Activity {
     private void applyPalette() {
         darkMode = prefs != null && prefs.getBoolean("dark_mode", false);
         if (darkMode) {
-            bg = Color.rgb(21, 23, 22);
-            surface = Color.rgb(32, 35, 34);
-            surface2 = Color.rgb(39, 42, 41);
-            topSurface = Color.argb(224, 32, 35, 34);
-            textColor = Color.rgb(241, 244, 242);
-            muted = Color.rgb(165, 172, 168);
-            accent = Color.rgb(67, 201, 139);
-            actionColor = Color.rgb(67, 201, 139);
-            actionSoft = Color.rgb(32, 61, 48);
-            incomeColor = Color.rgb(67, 201, 139);
-            expenseColor = Color.rgb(255, 107, 100);
-            transferColor = Color.rgb(105, 169, 255);
-            transferSoft = Color.rgb(32, 54, 79);
-            strokeColor = Color.rgb(52, 57, 55);
+            bg = Color.rgb(13, 15, 14);
+            surface = Color.rgb(24, 27, 25);
+            surface2 = Color.rgb(31, 35, 32);
+            topSurface = bg;
+            textColor = Color.rgb(244, 247, 245);
+            muted = Color.rgb(158, 168, 161);
+            accent = Color.rgb(84, 211, 154);
+            actionColor = Color.rgb(84, 211, 154);
+            actionSoft = Color.rgb(28, 58, 45);
+            incomeColor = Color.rgb(73, 209, 139);
+            expenseColor = Color.rgb(255, 116, 108);
+            transferColor = Color.rgb(114, 167, 255);
+            transferSoft = Color.rgb(31, 49, 73);
+            strokeColor = Color.rgb(43, 48, 45);
         } else {
-            bg = Color.rgb(244, 247, 245);
+            bg = Color.rgb(245, 247, 246);
             surface = Color.WHITE;
-            surface2 = Color.rgb(248, 250, 249);
-            topSurface = Color.argb(232, 255, 255, 255);
-            textColor = Color.rgb(24, 34, 46);
-            muted = Color.rgb(102, 112, 133);
-            accent = Color.rgb(19, 138, 97);
-            actionColor = Color.rgb(19, 138, 97);
-            actionSoft = Color.rgb(229, 244, 237);
-            incomeColor = Color.rgb(19, 138, 97);
-            expenseColor = Color.rgb(228, 61, 55);
-            transferColor = Color.rgb(29, 111, 218);
-            transferSoft = Color.rgb(231, 241, 255);
+            surface2 = Color.rgb(238, 242, 239);
+            topSurface = bg;
+            textColor = Color.rgb(24, 32, 27);
+            muted = Color.rgb(105, 117, 109);
+            accent = Color.rgb(18, 148, 101);
+            actionColor = Color.rgb(18, 148, 101);
+            actionSoft = Color.rgb(225, 244, 235);
+            incomeColor = Color.rgb(18, 148, 101);
+            expenseColor = Color.rgb(224, 72, 65);
+            transferColor = Color.rgb(45, 112, 214);
+            transferSoft = Color.rgb(229, 238, 252);
             strokeColor = Color.rgb(225, 231, 227);
         }
         Window window = getWindow();
@@ -316,7 +316,7 @@ public class MoneyMateActivity extends Activity {
         LinearLayout menu = new LinearLayout(this);
         menu.setOrientation(LinearLayout.VERTICAL);
         menu.setPadding(dp(10), dp(8), dp(10), dp(8));
-        menu.setBackground(rounded(surface, 16, 0, strokeColor));
+        menu.setBackground(rounded(surface, 8, 0, strokeColor));
         menu.addView(menuItem(R.drawable.ic_menu_period, "Periodo", "Elegir fecha con calendario", v -> closeThen(holder, () -> {
             if ("stats".equals(screen)) statsDateDialog();
             else monthDialog();
@@ -333,7 +333,7 @@ public class MoneyMateActivity extends Activity {
         int popupHeight = Math.min(dp(420), getResources().getDisplayMetrics().heightPixels - dp(120));
         holder[0] = new PopupWindow(menuScroll, dp(296), popupHeight, true);
         holder[0].setOutsideTouchable(true);
-        holder[0].setBackgroundDrawable(rounded(surface, 16, 0, strokeColor));
+        holder[0].setBackgroundDrawable(rounded(surface, 8, 0, strokeColor));
         holder[0].setElevation(0);
         holder[0].showAsDropDown(anchor, -dp(242), dp(4));
     }
@@ -451,7 +451,7 @@ public class MoneyMateActivity extends Activity {
         try {
             return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception ignored) {
-            return "2.1.0";
+            return "2.2.0";
         }
     }
 
@@ -598,7 +598,7 @@ public class MoneyMateActivity extends Activity {
         LinearLayout strip = new LinearLayout(this);
         strip.setOrientation(LinearLayout.HORIZONTAL);
         strip.setGravity(Gravity.CENTER_VERTICAL);
-        strip.setBackground(rounded(softAccent(), 6, 1, strokeColor));
+        strip.setBackground(rounded(importInProgress ? softAccent() : surface, 8, 0, strokeColor));
         strip.setPadding(dp(10), dp(8), dp(10), dp(8));
         strip.setLayoutParams(margins(-1, -2, 0, 8));
         String source = prefs.getString("last_import_name", "datos locales");
@@ -660,16 +660,19 @@ public class MoneyMateActivity extends Activity {
 
         PieChartView pie = new PieChartView(this);
         pie.setData(bars);
-        pie.setTextColor(textColor);
+        pie.setThemeColors(textColor, muted, surface2);
         pie.setCenterText(String.valueOf(bars.size()), ui(bars.size() == 1 ? "Cuenta" : "Cuentas"));
         pie.setContentDescription(ui("Distribución por cuenta"));
 
-        LinearLayout pieBox = flatSection();
-        pieBox.addView(text("Distribución por cuenta", 12, true, muted));
+        LinearLayout pieBox = panel();
+        pieBox.addView(text("Distribución por cuenta", 16, true, textColor));
+        TextView chartHint = text("Participación de cada cuenta en el periodo", 12, false, muted);
+        chartHint.setPadding(0, dp(3), 0, 0);
+        pieBox.addView(chartHint);
         if (bars.isEmpty()) {
             pieBox.addView(empty("Sin datos en este periodo."));
         } else {
-            pieBox.addView(pie, new LinearLayout.LayoutParams(-1, dp(206)));
+            pieBox.addView(pie, new LinearLayout.LayoutParams(-1, dp(184)));
             animateChart(pie);
         }
         content.addView(pieBox);
@@ -707,9 +710,17 @@ public class MoneyMateActivity extends Activity {
 
         TrendChartView trend = new TrendChartView(this);
         trend.setRows(rows);
-        LinearLayout chart = flatSection();
-        chart.addView(text("Movimiento mensual", 14, true, textColor));
-        chart.addView(trend, new LinearLayout.LayoutParams(-1, dp(168)));
+        DateRange range = statsRange();
+        trend.setRange(range.start, range.end, statsScope);
+        trend.setKind(statsKind);
+        trend.setLegendLabels(ui("Ingresos"), ui("Gastos"));
+        trend.setThemeColors(textColor, muted, surface2, incomeColor, expenseColor);
+        LinearLayout chart = panel();
+        chart.addView(text("Actividad del periodo", 16, true, textColor));
+        TextView chartHint = text("Ingresos y gastos distribuidos en el tiempo", 12, false, muted);
+        chartHint.setPadding(0, dp(3), 0, dp(6));
+        chart.addView(chartHint);
+        chart.addView(trend, new LinearLayout.LayoutParams(-1, dp(184)));
         content.addView(chart);
         animateChart(trend);
 
@@ -733,12 +744,13 @@ public class MoneyMateActivity extends Activity {
     private View statusExportAction() {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        row.setPadding(0, 0, 0, dp(6));
+        row.setPadding(0, 0, 0, dp(10));
         Button export = smallButton("Exportar estado XLSX", v -> prepareStatusReport());
         export.setTextSize(12);
         export.setTextColor(actionColor);
-        export.setBackground(rounded(controlSurface(), 7, 1, strokeColor));
-        row.addView(export, new LinearLayout.LayoutParams(dp(176), dp(38)));
+        export.setBackground(rounded(controlSurface(), 8, 0, strokeColor));
+        setButtonIcon(export, R.drawable.ic_menu_report, actionColor);
+        row.addView(export, new LinearLayout.LayoutParams(dp(190), dp(40)));
         return row;
     }
 
@@ -747,8 +759,8 @@ public class MoneyMateActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, dp(4), 0, dp(8));
-        row.setLayoutParams(margins(-1, -2, 0, 4));
+        row.setPadding(0, dp(2), 0, dp(8));
+        row.setLayoutParams(margins(-1, -2, 0, 6));
         TextView previous = navText("‹", v -> shiftStatsPeriod(-1));
         row.addView(previous, new LinearLayout.LayoutParams(dp(38), dp(42)));
         TextView month = text(range.label, 17, true, textColor);
@@ -758,7 +770,7 @@ public class MoneyMateActivity extends Activity {
         TextView next = navText("›", v -> shiftStatsPeriod(1));
         row.addView(next, new LinearLayout.LayoutParams(dp(38), dp(42)));
         LinearLayout scope = statsScopeControl();
-        LinearLayout.LayoutParams scopeParams = new LinearLayout.LayoutParams(dp(126), dp(42));
+        LinearLayout.LayoutParams scopeParams = new LinearLayout.LayoutParams(dp(128), dp(42));
         scopeParams.setMargins(dp(8), 0, 0, 0);
         row.addView(scope, scopeParams);
         return row;
@@ -768,7 +780,7 @@ public class MoneyMateActivity extends Activity {
         LinearLayout control = new LinearLayout(this);
         control.setOrientation(LinearLayout.HORIZONTAL);
         control.setGravity(Gravity.CENTER);
-        control.setBackground(rounded(controlSurface(), 8, 1, strokeColor));
+        control.setBackground(rounded(actionSoft, 8, 0, strokeColor));
         control.setPadding(dp(8), 0, dp(8), 0);
         Drawable drawable = getResources().getDrawable(R.drawable.ic_action_filter).mutate();
         drawable.setTint(actionColor);
@@ -785,40 +797,45 @@ public class MoneyMateActivity extends Activity {
 
     private LinearLayout statsTotalsHeader(MoneyDb.Summary s) {
         LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
+        box.setOrientation(LinearLayout.HORIZONTAL);
         box.setLayoutParams(margins(-1, -2, 0, 10));
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
         boolean incomeSelected = "income".equals(statsKind);
-        TextView income = text("Ingresos  " + money(s.income), 14, true, incomeSelected ? textColor : muted);
-        income.setGravity(Gravity.CENTER);
+        TextView income = statsMetricTab("Ingresos", money(s.income), incomeColor, incomeSelected);
         income.setOnClickListener(v -> {
             statsKind = "income";
             statsDetailAccount = null;
             renderScreen();
         });
-        row.addView(income, new LinearLayout.LayoutParams(0, dp(42), 1));
-        TextView expense = text("Gastos  " + money(s.expense), 14, true, incomeSelected ? muted : textColor);
-        expense.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams incomeParams = new LinearLayout.LayoutParams(0, dp(68), 1);
+        incomeParams.setMargins(0, 0, dp(5), 0);
+        box.addView(income, incomeParams);
+        TextView expense = statsMetricTab("Gastos", money(s.expense), expenseColor, !incomeSelected);
         expense.setOnClickListener(v -> {
             statsKind = "expense";
             statsDetailAccount = null;
             renderScreen();
         });
-        row.addView(expense, new LinearLayout.LayoutParams(0, dp(42), 1));
-        box.addView(row);
-
-        LinearLayout underline = new LinearLayout(this);
-        underline.setOrientation(LinearLayout.HORIZONTAL);
-        View incomeLine = new View(this);
-        incomeLine.setBackgroundColor(incomeSelected ? incomeColor : Color.TRANSPARENT);
-        underline.addView(incomeLine, new LinearLayout.LayoutParams(0, dp(3), 1));
-        View expenseLine = new View(this);
-        expenseLine.setBackgroundColor(incomeSelected ? Color.TRANSPARENT : expenseColor);
-        underline.addView(expenseLine, new LinearLayout.LayoutParams(0, dp(3), 1));
-        box.addView(underline);
+        LinearLayout.LayoutParams expenseParams = new LinearLayout.LayoutParams(0, dp(68), 1);
+        expenseParams.setMargins(dp(5), 0, 0, 0);
+        box.addView(expense, expenseParams);
         return box;
+    }
+
+    private TextView statsMetricTab(String label, String value, int color, boolean selected) {
+        String translated = ui(label);
+        String full = translated + "\n" + value;
+        SpannableString span = new SpannableString(full);
+        span.setSpan(new ForegroundColorSpan(selected ? color : muted), 0, translated.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        int valueStart = translated.length() + 1;
+        span.setSpan(new ForegroundColorSpan(selected ? textColor : muted), valueStart, full.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        span.setSpan(new StyleSpan(Typeface.BOLD), valueStart, full.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        span.setSpan(new RelativeSizeSpan(1.24f), valueStart, full.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        TextView view = text("", 13, false, textColor);
+        view.setText(span);
+        view.setGravity(Gravity.CENTER);
+        view.setBackground(rounded(selected ? ("Ingresos".equals(label) ? softIncome() : softExpense()) : surface, 8, 0, strokeColor));
+        view.setPadding(dp(8), dp(8), dp(8), dp(8));
+        return view;
     }
 
     private TextView navText(String value, View.OnClickListener listener) {
@@ -838,28 +855,49 @@ public class MoneyMateActivity extends Activity {
 
     private View statCategoryRow(MoneyDb.Bar bar, double total, int index) {
         LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setBackground(rounded(surface, 0, 0, strokeColor));
-        row.setPadding(dp(10), dp(9), dp(10), dp(9));
-        row.setLayoutParams(margins(-1, -2, 0, 1));
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setBackground(rounded(surface, 8, 0, strokeColor));
+        row.setPadding(dp(12), dp(10), dp(12), dp(10));
+        row.setLayoutParams(margins(-1, -2, 0, 6));
 
         int color = statColor(index);
         int pct = total <= 0 ? 0 : (int) Math.round(100d * bar.value / total);
-        TextView badge = text(pct + "%", 12, true, Color.WHITE);
-        badge.setGravity(Gravity.CENTER);
-        badge.setBackground(rounded(color, 6, 0, color));
-        row.addView(badge, new LinearLayout.LayoutParams(dp(52), dp(32)));
-
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        View dot = new View(this);
+        dot.setBackground(rounded(color, 5, 0, color));
+        LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(10), dp(10));
+        dotParams.setMargins(0, 0, dp(9), 0);
+        top.addView(dot, dotParams);
         TextView label = text(bar.label, 14, true, textColor);
         label.setGravity(Gravity.CENTER_VERTICAL);
-        label.setPadding(dp(12), 0, dp(8), 0);
+        label.setPadding(0, 0, dp(8), 0);
         label.setMaxLines(2);
-        row.addView(label, new LinearLayout.LayoutParams(0, dp(48), 1));
+        top.addView(label, new LinearLayout.LayoutParams(0, dp(38), 1));
 
-        TextView amount = text(money(bar.value), 13, true, textColor);
+        TextView amount = text(money(bar.value), 14, true, textColor);
         amount.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        row.addView(amount, new LinearLayout.LayoutParams(dp(112), dp(48)));
+        top.addView(amount, new LinearLayout.LayoutParams(dp(116), dp(38)));
+        row.addView(top);
+
+        LinearLayout detail = new LinearLayout(this);
+        detail.setOrientation(LinearLayout.HORIZONTAL);
+        detail.setGravity(Gravity.CENTER_VERTICAL);
+        TextView percent = text(pct + "% " + ui("del total"), 11, true, color);
+        detail.addView(percent, new LinearLayout.LayoutParams(0, dp(24), 1));
+        row.addView(detail);
+
+        LinearLayout track = new LinearLayout(this);
+        track.setOrientation(LinearLayout.HORIZONTAL);
+        track.setWeightSum(100f);
+        track.setBackground(rounded(surface2, 3, 0, strokeColor));
+        View fill = new View(this);
+        fill.setBackground(rounded(color, 3, 0, color));
+        float fillWeight = Math.max(1f, Math.min(100f, pct));
+        track.addView(fill, new LinearLayout.LayoutParams(0, dp(6), fillWeight));
+        track.addView(new View(this), new LinearLayout.LayoutParams(0, dp(6), 100f - fillWeight));
+        row.addView(track, new LinearLayout.LayoutParams(-1, dp(6)));
         row.setOnClickListener(v -> {
             statsDetailAccount = bar.label;
             renderScreen();
@@ -1070,7 +1108,7 @@ public class MoneyMateActivity extends Activity {
         row.addView(topActionButton("Nueva cuenta", v -> accountDialog()), new LinearLayout.LayoutParams(0, dp(44), 1));
         Button organize = topActionButton("Tipos y categorias", v -> accountMetadataDialog());
         organize.setTextColor(textColor);
-        organize.setBackground(rounded(controlSurface(), 6, 1, strokeColor));
+        organize.setBackground(rounded(controlSurface(), 8, 0, strokeColor));
         LinearLayout.LayoutParams organizeParams = new LinearLayout.LayoutParams(0, dp(44), 1);
         organizeParams.setMargins(dp(8), 0, 0, 0);
         row.addView(organize, organizeParams);
@@ -1086,14 +1124,17 @@ public class MoneyMateActivity extends Activity {
         return v;
     }
 
-    private TextView topAction(String label, View.OnClickListener listener) {
-        TextView v = text(label, 14, true, Color.WHITE);
-        v.setGravity(Gravity.CENTER);
-        v.setBackground(rounded(actionColor, 6, 0, actionColor));
-        v.setPadding(dp(12), 0, dp(12), 0);
-        v.setLayoutParams(margins(-1, dp(44), 0, 8));
-        v.setOnClickListener(listener);
-        return v;
+    private View topAction(String label, View.OnClickListener listener) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        row.setLayoutParams(margins(-1, dp(46), 0, 8));
+        TextView button = text("+  " + ui(label), 13, true, Color.WHITE);
+        button.setGravity(Gravity.CENTER);
+        button.setBackground(rounded(actionColor, 8, 0, actionColor));
+        button.setPadding(dp(14), 0, dp(14), 0);
+        button.setOnClickListener(listener);
+        row.addView(button, new LinearLayout.LayoutParams(dp(212), dp(44)));
+        return row;
     }
 
     private Button topActionButton(String label, View.OnClickListener listener) {
@@ -1101,7 +1142,7 @@ public class MoneyMateActivity extends Activity {
         b.setTextSize(13);
         b.setTypeface(Typeface.DEFAULT_BOLD);
         b.setTextColor(Color.WHITE);
-        b.setBackground(rounded(actionColor, 6, 0, actionColor));
+        b.setBackground(rounded(actionColor, 8, 0, actionColor));
         return b;
     }
 
@@ -3235,8 +3276,8 @@ public class MoneyMateActivity extends Activity {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setBackground(rounded(surface, 8, 0, strokeColor));
-        row.setPadding(dp(10), dp(9), dp(10), dp(9));
-        row.setLayoutParams(margins(-1, -2, 0, 2));
+        row.setPadding(dp(12), dp(10), dp(12), dp(10));
+        row.setLayoutParams(margins(-1, -2, 0, 6));
 
         TextView left = text("", 13, false, textColor);
         String primary = transfer ? "Transferencia" : r.category;
@@ -3276,9 +3317,9 @@ public class MoneyMateActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setBackground(rounded(hidden ? surface2 : surface, 10, 0, strokeColor));
-        row.setPadding(dp(10), dp(9), dp(10), dp(9));
-        row.setLayoutParams(margins(-1, -2, 0, 1));
+        row.setBackground(rounded(hidden ? surface2 : surface, 8, 0, strokeColor));
+        row.setPadding(dp(12), dp(10), dp(12), dp(10));
+        row.setLayoutParams(margins(-1, -2, 0, 6));
 
         String status = automatic ? "Saldo 0.00 · Oculta automáticamente" : a.hidden ? "Oculta manualmente" : displayAccountType(a.type);
         TextView name = text(a.name + "\n" + status, 13, false, hidden ? muted : textColor);
@@ -3299,7 +3340,7 @@ public class MoneyMateActivity extends Activity {
     private LinearLayout panel() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setBackground(rounded(surface, 8, 1, strokeColor));
+        box.setBackground(rounded(surface, 8, 0, strokeColor));
         box.setElevation(0);
         box.setPadding(dp(12), dp(12), dp(12), dp(12));
         box.setLayoutParams(margins(-1, -2, 0, 8));
@@ -3309,7 +3350,7 @@ public class MoneyMateActivity extends Activity {
     private LinearLayout compactPanel() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setBackground(rounded(surface, 8, 1, strokeColor));
+        box.setBackground(rounded(surface, 8, 0, strokeColor));
         box.setPadding(dp(8), dp(10), dp(8), dp(10));
         box.setLayoutParams(margins(-1, -2, 0, 8));
         return box;
@@ -3323,6 +3364,7 @@ public class MoneyMateActivity extends Activity {
         span.setSpan(new ForegroundColorSpan(muted), 0, label.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         span.setSpan(new ForegroundColorSpan(color), label.length() + 1, full.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         span.setSpan(new StyleSpan(Typeface.BOLD), label.length() + 1, full.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        span.setSpan(new RelativeSizeSpan(1.18f), label.length() + 1, full.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         v.setText(span);
         v.setGravity(Gravity.CENTER);
         v.setPadding(dp(6), 0, dp(6), 0);
@@ -3331,7 +3373,7 @@ public class MoneyMateActivity extends Activity {
 
     private TextView simpleLine(String title, String subtitle) {
         TextView v = text(title + "\n" + subtitle, 14, false, textColor);
-        v.setBackground(rounded(surface, 12, 0, strokeColor));
+        v.setBackground(rounded(surface, 8, 0, strokeColor));
         v.setElevation(0);
         v.setPadding(dp(12), dp(10), dp(12), dp(10));
         v.setLayoutParams(margins(-1, -2, 0, 6));
@@ -3358,7 +3400,7 @@ public class MoneyMateActivity extends Activity {
         });
         b.setTextColor(transactionMode.equals(target) ? actionColor : muted);
         b.setTextSize(10);
-        b.setBackground(rounded(transactionMode.equals(target) ? actionSoft : surface, 6, 1, strokeColor));
+        b.setBackground(rounded(transactionMode.equals(target) ? actionSoft : surface2, 8, 0, strokeColor));
         return b;
     }
 
@@ -3372,7 +3414,7 @@ public class MoneyMateActivity extends Activity {
         button.setCompoundDrawablePadding(dp(3));
         button.setTextColor(selected ? actionColor : muted);
         button.setTextSize(11);
-        button.setBackground(rounded(selected ? actionSoft : surface, 6, 1, strokeColor));
+        button.setBackground(rounded(selected ? actionSoft : surface2, 8, 0, strokeColor));
         return button;
     }
 
@@ -3454,9 +3496,9 @@ public class MoneyMateActivity extends Activity {
         tab.setOnClickListener(v -> screenTo(target));
         boolean selected = screen.equals(target);
         if (selected) {
-            tab.setBackground(new InsetDrawable(rounded(actionSoft, 17, 0, strokeColor), dp(6), dp(4), dp(6), dp(4)));
+            tab.setBackground(new InsetDrawable(rounded(actionSoft, 8, 0, strokeColor), dp(5), dp(4), dp(5), dp(4)));
         } else {
-            tab.setBackground(rounded(Color.TRANSPARENT, 18, 0, strokeColor));
+            tab.setBackgroundColor(Color.TRANSPARENT);
         }
 
         Drawable icon = getResources().getDrawable(iconRes).mutate();
@@ -3464,12 +3506,12 @@ public class MoneyMateActivity extends Activity {
         ImageView image = new ImageView(this);
         image.setImageDrawable(icon);
         image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        tab.addView(image, new LinearLayout.LayoutParams(dp(23), dp(23)));
+        tab.addView(image, new LinearLayout.LayoutParams(dp(25), dp(25)));
 
-        TextView text = text(label, 9, selected, selected ? actionColor : muted);
+        TextView text = text(label, 10, selected, selected ? actionColor : muted);
         text.setGravity(Gravity.CENTER);
         text.setIncludeFontPadding(false);
-        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(-2, dp(13));
+        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(-2, dp(15));
         textParams.setMargins(0, 0, 0, 0);
         tab.addView(text, textParams);
         return tab;
@@ -3488,7 +3530,7 @@ public class MoneyMateActivity extends Activity {
         b.setAllCaps(false);
         b.setTextSize(12);
         b.setTextColor(textColor);
-        b.setBackground(rounded(actionSoft, 6, 1, strokeColor));
+        b.setBackground(rounded(actionSoft, 8, 0, strokeColor));
         b.setOnClickListener(listener);
         b.setMinHeight(0);
         b.setMinimumHeight(0);
@@ -3525,7 +3567,7 @@ public class MoneyMateActivity extends Activity {
         b.setTextSize(15);
         b.setTypeface(Typeface.DEFAULT_BOLD);
         b.setTextColor(Color.WHITE);
-        b.setBackground(rounded(actionColor, 6, 0, actionColor));
+        b.setBackground(rounded(actionColor, 8, 0, actionColor));
         b.setLayoutParams(margins(-1, dp(52), 0, 8));
         return b;
     }
@@ -3559,7 +3601,7 @@ public class MoneyMateActivity extends Activity {
     private void styleDialog(AlertDialog dialog) {
         Window window = dialog.getWindow();
         if (window != null) {
-            window.setBackgroundDrawable(rounded(surface, 26, 1, strokeColor));
+            window.setBackgroundDrawable(rounded(surface, 12, 0, strokeColor));
             tintTextTree(window.getDecorView());
         }
         styleDialogButton(dialog.getButton(AlertDialog.BUTTON_POSITIVE));
@@ -3642,7 +3684,7 @@ public class MoneyMateActivity extends Activity {
         e.setTextColor(textColor);
         e.setHintTextColor(muted);
         e.setTextSize(14);
-        e.setBackground(rounded(controlSurface(), 16, 1, strokeColor));
+        e.setBackground(rounded(controlSurface(), 8, 0, strokeColor));
         e.setPadding(dp(12), 0, dp(12), 0);
         e.setLayoutParams(margins(-1, dp(48), 0, 8));
         return e;
@@ -3655,12 +3697,12 @@ public class MoneyMateActivity extends Activity {
         input.setTextColor(textColor);
         input.setHintTextColor(muted);
         input.setTextSize(14);
-        input.setBackground(rounded(controlSurface(), 16, 1, strokeColor));
+        input.setBackground(rounded(controlSurface(), 8, 0, strokeColor));
         input.setPadding(dp(12), 0, dp(12), 0);
         input.setLayoutParams(margins(-1, dp(48), 0, 8));
         input.setThreshold(1);
         input.setDropDownVerticalOffset(dp(4));
-        input.setDropDownBackgroundDrawable(rounded(surface, 12, 1, strokeColor));
+        input.setDropDownBackgroundDrawable(rounded(surface, 8, 0, strokeColor));
         input.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_dropdown_item_1line, suggestions) {
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
@@ -3732,7 +3774,7 @@ public class MoneyMateActivity extends Activity {
         if (values.isEmpty()) values.add("Sin datos");
         Spinner s = new Spinner(this);
         s.setAdapter(stringAdapter(values));
-        s.setBackground(rounded(controlSurface(), 16, 1, strokeColor));
+        s.setBackground(rounded(controlSurface(), 8, 0, strokeColor));
         s.setPadding(dp(8), 0, dp(8), 0);
         s.setLayoutParams(margins(-1, dp(48), 0, 8));
         return s;
@@ -3755,7 +3797,7 @@ public class MoneyMateActivity extends Activity {
     private Spinner accountSpinner(List<AccountSelectionOption> values) {
         Spinner spinner = new Spinner(this);
         setAccountSpinnerChoices(spinner, values, null);
-        spinner.setBackground(rounded(controlSurface(), 16, 1, strokeColor));
+        spinner.setBackground(rounded(controlSurface(), 8, 0, strokeColor));
         spinner.setPadding(dp(8), 0, dp(8), 0);
         spinner.setLayoutParams(margins(-1, dp(48), 0, 8));
         return spinner;
@@ -3852,7 +3894,7 @@ public class MoneyMateActivity extends Activity {
     }
 
     private int controlSurface() {
-        return darkMode ? Color.rgb(22, 34, 25) : Color.rgb(248, 255, 250);
+        return surface2;
     }
 
     private List<String> labels(String... values) {

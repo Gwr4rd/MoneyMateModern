@@ -14,6 +14,8 @@ final class PieChartView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final List<MoneyDb.Bar> data = new ArrayList<>();
     private int textColor = Color.WHITE;
+    private int mutedColor = Color.LTGRAY;
+    private int trackColor = Color.DKGRAY;
     private String centerTitle = "";
     private String centerSubtitle = "";
     private final int[] colors = new int[]{
@@ -37,8 +39,10 @@ final class PieChartView extends View {
         invalidate();
     }
 
-    void setTextColor(int color) {
-        textColor = color;
+    void setThemeColors(int text, int muted, int track) {
+        textColor = text;
+        mutedColor = muted;
+        trackColor = track;
         invalidate();
     }
 
@@ -53,10 +57,11 @@ final class PieChartView extends View {
         super.onDraw(canvas);
         double total = 0;
         for (MoneyDb.Bar b : data) total += b.value;
-        float density = getResources().getDisplayMetrics().scaledDensity;
-        float available = Math.max(1f, Math.min(getWidth(), getHeight()));
-        float outerSize = available * 0.72f;
-        float stroke = Math.max(18f * density, outerSize * 0.18f);
+        float density = getResources().getDisplayMetrics().density;
+        float scaledDensity = getResources().getDisplayMetrics().scaledDensity;
+        float available = Math.max(1f, Math.min(getWidth(), getHeight()) - 20f * density);
+        float outerSize = Math.min(available * 0.82f, 164f * density);
+        float stroke = Math.max(15f * density, outerSize * 0.12f);
         float arcSize = Math.max(1f, outerSize - stroke);
         float left = (getWidth() - arcSize) / 2f;
         float top = (getHeight() - arcSize) / 2f;
@@ -64,28 +69,29 @@ final class PieChartView extends View {
 
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(stroke);
-        paint.setStrokeCap(Paint.Cap.BUTT);
-        paint.setColor(Color.argb(38, Color.red(textColor), Color.green(textColor), Color.blue(textColor)));
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setColor(trackColor);
         canvas.drawArc(rect, -90, 360, false, paint);
         if (total <= 0) return;
 
         float start = -90f;
+        float gap = data.size() <= 1 ? 3.5f : Math.max(1.8f, 4.2f - data.size() * 0.22f);
         for (int i = 0; i < data.size(); i++) {
             float sweep = (float) (360d * data.get(i).value / total);
             paint.setColor(colors[i % colors.length]);
-            canvas.drawArc(rect, start, Math.max(0f, sweep - 1.2f), false, paint);
+            canvas.drawArc(rect, start + gap / 2f, Math.max(0f, sweep - gap), false, paint);
             start += sweep;
         }
 
         paint.setStyle(Paint.Style.FILL);
         paint.setTextAlign(Paint.Align.CENTER);
         paint.setColor(textColor);
-        paint.setTextSize(17f * density);
+        paint.setTextSize(22f * scaledDensity);
         paint.setFakeBoldText(true);
         canvas.drawText(centerTitle, rect.centerX(), rect.centerY() - 2f * density, paint);
         paint.setFakeBoldText(false);
-        paint.setTextSize(11f * density);
-        paint.setColor(Color.argb(190, Color.red(textColor), Color.green(textColor), Color.blue(textColor)));
-        canvas.drawText(centerSubtitle, rect.centerX(), rect.centerY() + 15f * density, paint);
+        paint.setTextSize(11f * scaledDensity);
+        paint.setColor(mutedColor);
+        canvas.drawText(centerSubtitle, rect.centerX(), rect.centerY() + 18f * density, paint);
     }
 }

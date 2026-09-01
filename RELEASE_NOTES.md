@@ -1,24 +1,25 @@
-# Control Financiero 2.1.0
+# Control Financiero 2.2.0
 
-Actualización centrada en la protección de los datos locales y una sincronización más predecible en Android y web.
+Actualización visual centrada en mejorar la lectura de transacciones, cuentas y gráficos tanto en modo claro como oscuro.
 
 ## Novedades
 
-- Vista previa antes de importar: muestra cuentas, categorías, movimientos, transferencias, periodo e importes.
-- Detección y omisión de movimientos exactamente duplicados dentro del respaldo.
-- Copia de recuperación automática antes de importar y opción `Deshacer última importación`.
-- Revisión de integridad para detectar base dañada, duplicados, cuentas faltantes, datos inválidos y transferencias incompletas.
-- Reparación segura de duplicados y movimientos cuya cuenta ya no existe.
-- Protección de conflictos de Supabase: la aplicación pide elegir entre la copia local y la nube en vez de sobrescribir cambios silenciosamente.
-- Importación y validación web de respaldos JSON con la misma vista previa y recuperación.
-- Nueva lógica de importación e integridad desarrollada en Kotlin como parte de la migración gradual.
-- Traducciones completas de estas funciones en español, inglés, portugués y francés.
+- Nuevo modo oscuro carbón inspirado en interfaces Android modernas, con superficies mate y mejor contraste.
+- Modo claro equivalente, con la misma distribución para evitar cambios de tamaño al alternar el tema.
+- Cabecera más limpia y barra inferior más compacta, con iconos y textos mejor proporcionados.
+- Tarjetas, campos y botones simplificados, sin sombras ni bordes innecesarios.
+- Acción `Nuevo movimiento` más discreta para dar prioridad a los datos.
+- Resumen de Estado renovado con cifras destacadas y selección clara entre ingresos y gastos.
+- Gráfico circular más pequeño, con segmentos redondeados y sin recortes.
+- Barras de progreso por cuenta con porcentaje, importe y color identificable.
+- Gráfico temporal rediseñado con barras redondeadas, leyenda y etiquetas adaptadas al periodo diario, semanal, mensual, semestral, anual o total.
+- Textos nuevos traducidos al español, inglés, portugués y francés.
 
 ## Instalación
 
-1. Descarga `Control-Financiero-release-signed-v2.1.0.apk`.
+1. Descarga `Control-Financiero-release-signed-v2.2.0.apk`.
 2. Instálala sobre la versión anterior para conservar los datos y la sesión local.
-3. Antes de importar un archivo importante, revisa el resumen presentado por la aplicación.
+3. Puedes cambiar entre modo claro y oscuro desde `Menú > Preferencias`.
 
 ## Requisitos
 
