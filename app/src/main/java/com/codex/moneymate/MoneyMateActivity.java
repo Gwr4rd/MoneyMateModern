@@ -218,7 +218,7 @@ public class MoneyMateActivity extends Activity {
         logo.setImageResource(R.drawable.app_pig);
         logo.setAdjustViewBounds(true);
         logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        top.addView(logo, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        top.addView(logo, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
         String subtitle;
         if ("stats".equals(screen)) subtitle = titleForScreen() + " · " + statsRange().label;

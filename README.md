@@ -6,7 +6,7 @@ Aplicacion de finanzas personales sin anuncios para Android 10 o superior, acomp
 
 - `Transacciones`, `Estado` y `Cuentas` con interfaz clara y modo oscuro mate.
 - Interfaz traducible a español, inglés, portugués y francés.
-- Icono del cerdito en el lanzador y en la web.
+- Nuevo cerdito menta transparente en el lanzador y dentro de la aplicacion Android.
 - Gastos, ingresos y transferencias editables y copiables.
 - Transferencias agrupadas visualmente en una sola fila, con texto azul y sin sombreado.
 - Flujo simplificado para registrar movimientos: tipo de cuenta, cuenta y una nota obligatoria como detalle principal.
