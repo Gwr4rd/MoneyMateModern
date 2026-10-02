@@ -266,33 +266,6 @@ export default function App() {
     }), false);
   }
 
-  function saveCategory(original, category) {
-    const duplicate = data.categories.some((item) => item.name === category.name && item.kind === category.kind && item !== original);
-    if (duplicate) return;
-    commitData((current) => ({
-      ...current,
-      categories: original
-        ? current.categories.map((item) => item.name === original.name && item.kind === original.kind ? category : item)
-        : [...current.categories, category],
-      transactions: original && original.name !== category.name
-        ? current.transactions.map((transaction) => transaction.kind === original.kind && transaction.category === original.name
-          ? { ...transaction, category: category.name }
-          : transaction)
-        : current.transactions,
-    }), false);
-  }
-
-  function deleteCategory(category) {
-    if (data.transactions.some((transaction) => transaction.category === category.name && transaction.kind === category.kind)) {
-      window.alert(t("No se puede eliminar una categoria que tiene movimientos.", language));
-      return;
-    }
-    commitData((current) => ({
-      ...current,
-      categories: current.categories.filter((item) => item.name !== category.name || item.kind !== category.kind),
-    }), false);
-  }
-
   function toggleAccountHidden(account) {
     commitData((current) => ({
       ...current,
@@ -589,12 +562,9 @@ export default function App() {
       {dialog === "metadata" ? (
         <MetadataDialog
           accountTypes={data.accountTypes}
-          categories={data.categories}
           onClose={() => setDialog(null)}
           onSaveType={saveAccountType}
           onDeleteType={deleteAccountType}
-          onSaveCategory={saveCategory}
-          onDeleteCategory={deleteCategory}
           language={language}
         />
       ) : null}

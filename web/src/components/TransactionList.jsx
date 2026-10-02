@@ -39,18 +39,18 @@ function TransactionRow({ transaction, currencyCode, onEdit, onCopy, onDelete, l
   const transfer = transaction.kind === "transfer";
   const income = transaction.kind === "income";
   const Icon = transfer ? ArrowRightLeft : income ? CircleDollarSign : ReceiptText;
-  const title = transfer ? t("Transferencia", language) : t(transaction.category, language);
+  const movementLabel = t(transfer ? "Transferencia" : income ? "Ingreso" : "Gasto", language);
+  const title = transaction.note?.trim() || movementLabel;
   const accountMeta = transfer
     ? `${transaction.account} → ${transaction.toAccount}`
     : transaction.account;
-  const note = transaction.note || transaction.description;
   return (
     <article className={`transaction-row ${transaction.kind}`}>
       <div className="transaction-icon"><Icon size={20} /></div>
       <div className="transaction-copy">
-        <strong>{title}</strong>
-        <span className="transaction-meta">{accountMeta}</span>
-        {note ? <span className="transaction-note">{note}</span> : null}
+        <strong className="transaction-note-primary">{title}</strong>
+        <span className="transaction-meta">{movementLabel} · {accountMeta}</span>
+        {transaction.description ? <span className="transaction-description">{transaction.description}</span> : null}
       </div>
       <time>{transaction.time}</time>
       <strong className="transaction-amount">{currency(transaction.amount, currencyCode)}</strong>

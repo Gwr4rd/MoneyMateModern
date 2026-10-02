@@ -1,5 +1,5 @@
 export const STORAGE_KEY = "moneymate-modern-v2";
-export const APP_VERSION = "2.1.0";
+export const APP_VERSION = "2.3.0";
 
 export const seedData = {
   version: 2,

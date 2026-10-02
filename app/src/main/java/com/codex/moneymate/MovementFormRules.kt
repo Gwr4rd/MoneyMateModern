@@ -11,9 +11,9 @@ data class MovementFormRule(
 object MovementFormRules {
     @JvmStatic
     fun forPosition(position: Int): MovementFormRule = when (position) {
-        1 -> MovementFormRule("income", false, "Cuenta", true, false)
+        1 -> MovementFormRule("income", false, "Cuenta", false, false)
         2 -> MovementFormRule("transfer", true, "Cuenta origen", false, true)
-        else -> MovementFormRule("expense", false, "Cuenta", true, false)
+        else -> MovementFormRule("expense", false, "Cuenta", false, false)
     }
 
     @JvmStatic

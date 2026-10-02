@@ -1,38 +1,38 @@
 :root {
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #18222e;
-  background: #f4f7f5;
+  background: #f2f7f4;
   font-synthesis: none;
-  --bg: #f4f7f5;
+  --bg: #f2f7f4;
   --surface: #ffffff;
-  --surface-2: #f8faf9;
+  --surface-2: #edf5f0;
   --text: #18222e;
   --muted: #667085;
-  --border: #e1e7e3;
-  --green: #138a61;
-  --green-soft: #e5f4ed;
-  --red: #e43d37;
-  --red-soft: #ffedeb;
-  --blue: #1d6fda;
-  --blue-soft: #e7f1ff;
-  --control: #f8fbf9;
+  --border: #d8e5de;
+  --green: #07966a;
+  --green-soft: #dcf5e9;
+  --red: #e84b4b;
+  --red-soft: #ffebe9;
+  --blue: #3478f6;
+  --blue-soft: #e8f0ff;
+  --control: #f7fbf8;
   color-scheme: light;
 }
 
 :root[data-theme="dark"] {
-  --bg: #151716;
-  --surface: #202322;
-  --surface-2: #272a29;
+  --bg: #101412;
+  --surface: #1a201d;
+  --surface-2: #222a26;
   --text: #f1f4f2;
   --muted: #a5aca8;
-  --border: #343937;
-  --green: #43c98b;
-  --green-soft: #203d30;
-  --red: #ff6b64;
-  --red-soft: #462726;
-  --blue: #69a9ff;
-  --blue-soft: #20364f;
-  --control: #252927;
+  --border: #303a35;
+  --green: #47d69a;
+  --green-soft: #173d2d;
+  --red: #ff716d;
+  --red-soft: #472523;
+  --blue: #78aaff;
+  --blue-soft: #1c3555;
+  --control: #202723;
   color-scheme: dark;
 }
 
@@ -375,24 +375,30 @@ select:focus-visible {
   grid-template-columns: 36px minmax(0, 1fr) 54px minmax(96px, auto) 94px;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-  background: transparent;
+  margin-bottom: 7px;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--red);
+  border-radius: 8px;
+  background: var(--surface);
   transition: background-color 160ms ease, transform 160ms ease;
 }
 
 .transaction-row:hover {
-  background: var(--surface);
+  background: var(--control);
   transform: translateY(-1px);
 }
 
 .transaction-row.transfer {
-  margin: 0;
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  border-radius: 0;
-  background: transparent;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--blue);
+  border-radius: 8px;
+  background: var(--surface);
   color: var(--blue);
+}
+
+.transaction-row.income {
+  border-left-color: var(--green);
 }
 
 .transaction-icon {
@@ -429,7 +435,7 @@ select:focus-visible {
 
 .transaction-copy strong {
   margin-bottom: 3px;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .transaction-copy span,
@@ -438,11 +444,19 @@ select:focus-visible {
   font-size: 12px;
 }
 
-.transaction-copy .transaction-note {
-  margin-top: 4px;
+.transaction-copy .transaction-note-primary {
   color: var(--text);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.transaction-copy .transaction-description {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
   line-height: 1.3;
   white-space: normal;
 }
@@ -861,7 +875,11 @@ select:focus-visible {
   grid-template-columns: 36px minmax(0, 1fr) minmax(96px, auto) 94px;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
 }
 
 .account-row.hidden {
@@ -969,7 +987,7 @@ select:focus-visible {
 .report-form,
 .backup-dialog {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   padding: 18px;
 }
 
@@ -980,6 +998,7 @@ select:focus-visible {
   gap: 6px;
   color: var(--muted);
   font-size: 12px;
+  font-weight: 700;
 }
 
 .movement-kind-switch {
@@ -1005,7 +1024,7 @@ select:focus-visible {
   min-height: 40px;
   padding: 0 6px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--control);
   color: var(--muted);
   cursor: pointer;
@@ -1041,9 +1060,62 @@ select:focus-visible {
   height: 44px;
   padding: 0 11px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--control);
   color: var(--text);
+}
+
+.amount-field input {
+  height: 60px;
+  border-color: color-mix(in srgb, var(--green) 45%, var(--border));
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.compact-date-time input {
+  background: var(--surface-2);
+}
+
+.account-route {
+  display: grid;
+  gap: 10px;
+  padding-left: 12px;
+  border-left: 3px solid var(--blue);
+}
+
+.account-route.single {
+  border-left-color: var(--green);
+}
+
+.route-title {
+  color: var(--blue);
+  font-size: 13px;
+}
+
+.route-title.destination {
+  margin-top: 5px;
+}
+
+.note-field input {
+  height: 52px;
+  border-color: color-mix(in srgb, var(--green) 50%, var(--border));
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.note-field.has-error input {
+  border-color: var(--red);
+  background: var(--red-soft);
+}
+
+.field-error {
+  color: var(--red);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .movement-form .account-select {

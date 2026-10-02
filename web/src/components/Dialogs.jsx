@@ -52,6 +52,8 @@ function AccountSelect({ label, name, value, accounts, onChange, language }) {
   );
 }
 
+const automaticCategory = (kind) => kind === "income" ? "Ingreso" : kind === "expense" ? "Gasto" : "Transferencia";
+
 export function MovementDialog({ data, initial = null, mode = "new", onClose, onSave, language }) {
   const availableAccounts = useMemo(() => accountBalances(data)
     .map((account, index) => ({
@@ -71,6 +73,7 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
   const defaultAccountType = availableAccounts.find((account) => account.name === defaultAccount)?.type || accountTypes[0] || "";
   const defaultToAccountType = availableAccounts.find((account) => account.name === defaultToAccount)?.type || accountTypes[0] || "";
   const [showNoteSuggestions, setShowNoteSuggestions] = useState(false);
+  const [noteError, setNoteError] = useState(false);
   const [form, setForm] = useState({
     date: mode === "copy" ? today() : initial?.date || today(),
     time: mode === "copy" ? new Date().toTimeString().slice(0, 5) : initial?.time || new Date().toTimeString().slice(0, 5),
@@ -79,14 +82,13 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
     account: defaultAccount,
     toAccountType: defaultToAccountType,
     toAccount: defaultToAccount,
-    category: initial?.category || data.categories.find((category) => category.kind === "expense")?.name || "",
+    category: initial?.category || automaticCategory("expense"),
     amount: initial?.amount ?? "",
     note: initial?.note || "",
     description: initial?.description || "",
   });
   const filteredAccounts = availableAccounts.filter((account) => account.type === form.accountType);
   const filteredToAccounts = availableAccounts.filter((account) => account.type === form.toAccountType);
-  const categories = data.categories.filter((category) => category.kind === form.kind);
   const previousNotes = useMemo(() => {
     const seen = new Set();
     return data.transactions.reduce((notes, transaction) => {
@@ -114,7 +116,7 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
     setForm((current) => {
       const next = { ...current, [name]: value };
       if (name === "kind" && value !== "transfer") {
-        next.category = data.categories.find((category) => category.kind === value)?.name || "";
+        next.category = initial?.kind === value && initial?.category ? initial.category : automaticCategory(value);
       }
       if (name === "accountType") {
         const choices = availableAccounts.filter((account) => account.type === value);
@@ -130,6 +132,10 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
 
   function submit(event) {
     event.preventDefault();
+    if (!form.note.trim()) {
+      setNoteError(true);
+      return;
+    }
     if (!Number(form.amount) || Number(form.amount) <= 0) return;
     if (!form.account || !filteredAccounts.some((account) => account.name === form.account)) return;
     if (form.kind === "transfer" && (!form.toAccount || !filteredToAccounts.some((account) => account.name === form.toAccount))) return;
@@ -139,7 +145,7 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
       ...movement,
       id: mode === "edit" ? initial.id : crypto.randomUUID(),
       amount: Number(form.amount),
-      category: form.kind === "transfer" ? "Transferencia" : form.category,
+      category: form.kind === "transfer" ? "Transferencia" : (form.category || automaticCategory(form.kind)),
       toAccount: form.kind === "transfer" ? form.toAccount : "",
     });
   }
@@ -148,9 +154,7 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
     setForm((current) => ({
       ...current,
       kind,
-      category: kind === "transfer"
-        ? "Transferencia"
-        : data.categories.find((category) => category.kind === kind)?.name || "",
+      category: initial?.kind === kind && initial?.category ? initial.category : automaticCategory(kind),
     }));
   }
 
@@ -175,53 +179,53 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
             </button>
           ))}
         </fieldset>
-        <div className="form-pair">
+        <label className="amount-field">{t("Importe", language)}<input name="amount" type="number" min="0.01" step="0.01" value={form.amount} onChange={change} inputMode="decimal" autoFocus /></label>
+        <div className="form-pair compact-date-time">
           <label>{t("Fecha", language)}<input name="date" type="date" value={form.date} onChange={change} /></label>
           <label>{t("Hora", language)}<input name="time" type="time" value={form.time} onChange={change} /></label>
         </div>
-        <label>{t("Importe", language)}<input name="amount" type="number" min="0.01" step="0.01" value={form.amount} onChange={change} autoFocus /></label>
         {form.kind === "transfer" ? (
-          <>
+          <div className="account-route">
+            <strong className="route-title">{t("Cuenta origen", language)}</strong>
             <label>{t("Tipo de origen", language)}
               <select name="accountType" value={form.accountType} onChange={change}>
                 {accountTypes.map((value) => <option value={value} key={value}>{t(value, language)}</option>)}
               </select>
             </label>
             <AccountSelect label="Cuenta origen" name="account" value={form.account} accounts={filteredAccounts} onChange={change} language={language} />
+            <strong className="route-title destination">{t("Cuenta destino", language)}</strong>
             <label>{t("Tipo de destino", language)}
               <select name="toAccountType" value={form.toAccountType} onChange={change}>
                 {accountTypes.map((value) => <option value={value} key={value}>{t(value, language)}</option>)}
               </select>
             </label>
             <AccountSelect label="Cuenta destino" name="toAccount" value={form.toAccount} accounts={filteredToAccounts} onChange={change} language={language} />
-          </>
+          </div>
         ) : (
-          <>
-            <label>{t("Categoria", language)}
-              <select name="category" value={form.category} onChange={change}>
-                {categories.map((category) => <option value={category.name} key={category.name}>{t(category.name, language)}</option>)}
-              </select>
-            </label>
+          <div className="account-route single">
             <label>{t("Tipo de cuenta", language)}
               <select name="accountType" value={form.accountType} onChange={change}>
                 {accountTypes.map((value) => <option value={value} key={value}>{t(value, language)}</option>)}
               </select>
             </label>
             <AccountSelect label="Cuenta" name="account" value={form.account} accounts={filteredAccounts} onChange={change} language={language} />
-          </>
+          </div>
         )}
-        <label className="note-field">{t("Nota", language)}
+        <label className={`note-field ${noteError ? "has-error" : ""}`}>{t("Nota obligatoria", language)}
           <span className="note-autocomplete">
             <input
               name="note"
               value={form.note}
               onChange={(event) => {
                 change(event);
+                if (event.target.value.trim()) setNoteError(false);
                 setShowNoteSuggestions(true);
               }}
               onFocus={() => setShowNoteSuggestions(true)}
               onBlur={() => window.setTimeout(() => setShowNoteSuggestions(false), 120)}
               autoComplete="off"
+              required
+              aria-invalid={noteError}
               placeholder={t("Escribe para buscar notas anteriores", language)}
             />
             {showNoteSuggestions && noteSuggestions.length ? (
@@ -243,8 +247,8 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
               </span>
             ) : null}
           </span>
+          {noteError ? <small className="field-error">{t("La nota es obligatoria.", language)}</small> : null}
         </label>
-        <label>{t("Descripcion", language)}<input name="description" value={form.description} onChange={change} /></label>
         <button className="dialog-primary" type="submit">
           {t(mode === "edit" ? "Guardar" : mode === "copy" ? "Copiar" : "Guardar", language)}
         </button>
@@ -301,13 +305,11 @@ export function AccountDialog({ account = null, accountTypes = [], currencyCode,
   );
 }
 
-export function MetadataDialog({ accountTypes, categories, onClose, onSaveType, onDeleteType, onSaveCategory, onDeleteCategory, language }) {
+export function MetadataDialog({ accountTypes, onClose, onSaveType, onDeleteType, language }) {
   const [typeName, setTypeName] = useState("");
-  const [categoryName, setCategoryName] = useState("");
-  const [categoryKind, setCategoryKind] = useState("expense");
 
   return (
-    <Modal title={t("Tipos y categorias", language)} onClose={onClose} language={language}>
+    <Modal title={t("Organizar cuentas", language)} onClose={onClose} language={language}>
       <div className="metadata-form">
         <section>
           <h3>{t("Tipo de cuenta", language)}</h3>
@@ -336,42 +338,6 @@ export function MetadataDialog({ accountTypes, categories, onClose, onSaveType, 
                 </div>
               );
             })}
-          </div>
-        </section>
-        <section>
-          <h3>{t("Categoria", language)}</h3>
-          <div className="metadata-add category-add">
-            <input placeholder={t("Nueva categoria", language)} value={categoryName} onChange={(event) => setCategoryName(event.target.value)} />
-            <select value={categoryKind} onChange={(event) => setCategoryKind(event.target.value)}>
-              <option value="expense">{t("Gasto", language)}</option>
-              <option value="income">{t("Ingreso", language)}</option>
-            </select>
-            <button type="button" onClick={() => {
-              const value = categoryName.trim();
-              if (!value) return;
-              onSaveCategory(null, { name: value, kind: categoryKind });
-              setCategoryName("");
-            }}><ListPlus size={18} /> {t("Agregar", language)}</button>
-          </div>
-          <div className="metadata-list">
-            {categories.map((category) => (
-              <div className="category-metadata-row" key={`${category.kind}-${category.name}`}>
-                <span>{category.name}<small>{t(category.kind === "income" ? "Ingreso" : "Gasto", language)}</small></span>
-                <select
-                  aria-label={`${t("Categoria", language)} ${category.name}`}
-                  value={category.kind}
-                  onChange={(event) => onSaveCategory(category, { ...category, kind: event.target.value })}
-                >
-                  <option value="expense">{t("Gasto", language)}</option>
-                  <option value="income">{t("Ingreso", language)}</option>
-                </select>
-                <button type="button" onClick={() => {
-                  const value = window.prompt(t("Nuevo nombre de la categoria", language), category.name)?.trim();
-                  if (value) onSaveCategory(category, { ...category, name: value });
-                }}>{t("Editar", language)}</button>
-                <button className="danger" type="button" onClick={() => onDeleteCategory(category)}><Trash2 size={16} /></button>
-              </div>
-            ))}
           </div>
         </section>
       </div>
@@ -591,7 +557,6 @@ export function BackupDialog({ data, canUndo, onClose, onExport, onApply, onUndo
               <PreviewValue label={t("Movimientos", language)} value={preview.movements} />
               <PreviewValue label={t("Transferencias", language)} value={preview.transfers} />
               <PreviewValue label={t("Cuentas", language)} value={preview.accounts} />
-              <PreviewValue label={t("Categorias", language)} value={preview.categories} />
               <PreviewValue label={t("Ingresos", language)} value={currency(preview.income, preview.data.currency)} />
               <PreviewValue label={t("Gastos", language)} value={currency(preview.expense, preview.data.currency)} />
             </div>

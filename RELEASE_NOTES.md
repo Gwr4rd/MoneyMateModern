@@ -1,29 +1,32 @@
-# Control Financiero 2.2.0
+# Control Financiero 2.3.0
 
-Actualización visual centrada en mejorar la lectura de transacciones, cuentas y gráficos tanto en modo claro como oscuro.
+Esta version simplifica el registro de movimientos y da protagonismo al dato que realmente explica cada operacion: la nota.
 
 ## Novedades
 
-- Nuevo modo oscuro carbón inspirado en interfaces Android modernas, con superficies mate y mejor contraste.
-- Modo claro equivalente, con la misma distribución para evitar cambios de tamaño al alternar el tema.
-- Cabecera más limpia y barra inferior más compacta, con iconos y textos mejor proporcionados.
-- Tarjetas, campos y botones simplificados, sin sombras ni bordes innecesarios.
-- Acción `Nuevo movimiento` más discreta para dar prioridad a los datos.
-- Resumen de Estado renovado con cifras destacadas y selección clara entre ingresos y gastos.
-- Gráfico circular más pequeño, con segmentos redondeados y sin recortes.
-- Barras de progreso por cuenta con porcentaje, importe y color identificable.
-- Gráfico temporal rediseñado con barras redondeadas, leyenda y etiquetas adaptadas al periodo diario, semanal, mensual, semestral, anual o total.
-- Textos nuevos traducidos al español, inglés, portugués y francés.
+- Formulario de movimientos reorganizado con solo los campos esenciales: tipo, fecha, importe, tipo de cuenta, cuenta y nota.
+- La nota ahora es obligatoria, mas grande y visible en cada transaccion.
+- Tipos de cuenta y cuentas mas visuales, con colores y jerarquia clara.
+- La administracion se concentra en tipos de cuenta; las categorias dejan de formar parte del flujo visible.
+- Tarjetas de transacciones mas vivas, con iconos y colores diferenciados para ingresos, gastos y transferencias.
+- Campos de importe, selectores y botones modernizados tanto en Android como en la web.
+- Busqueda enfocada en notas, cuentas, fechas, tipos e importes.
+- Vista previa de importacion y mensajes de sincronizacion mas simples.
+- Version mostrada en la web corregida y alineada con la APK.
 
-## Instalación
+## Compatibilidad
 
-1. Descarga `Control-Financiero-release-signed-v2.2.0.apk`.
-2. Instálala sobre la versión anterior para conservar los datos y la sesión local.
-3. Puedes cambiar entre modo claro y oscuro desde `Menú > Preferencias`.
+- Las categorias y descripciones existentes se conservan internamente al editar, importar, exportar y sincronizar; esta actualizacion no elimina esos datos.
+- Se mantienen los respaldos MMBAK, CSV, JSON y XLSX.
+- El identificador y la firma son los mismos de las versiones anteriores, por lo que puede instalarse sobre `2.2.0` sin borrar los datos locales.
+
+## Instalacion
+
+1. Descarga `Control-Financiero-release-signed-v2.3.0.apk`.
+2. Instalala sobre la version anterior.
+3. Abre la aplicacion y conserva tu sesion y datos locales.
 
 ## Requisitos
 
 - Android 10 o posterior.
-- La sincronización con Supabase continúa siendo opcional.
-
-El identificador y la firma se mantienen para que Android reconozca esta versión como una actualización compatible.
+- La sincronizacion con Supabase continua siendo opcional.

@@ -9,11 +9,12 @@ Aplicacion de finanzas personales sin anuncios para Android 10 o superior, acomp
 - Icono del cerdito en el lanzador y en la web.
 - Gastos, ingresos y transferencias editables y copiables.
 - Transferencias agrupadas visualmente en una sola fila, con texto azul y sin sombreado.
-- Busqueda por cuenta, categoria, notas, descripcion, fechas, tipo e importe.
+- Flujo simplificado para registrar movimientos: tipo de cuenta, cuenta y una nota obligatoria como detalle principal.
+- Busqueda por cuenta, nota, fecha, tipo e importe.
 - Estado diario, semanal, mensual, semestral, anual o completo con graficas por cuenta y leyendas completas.
 - Exportacion de ingresos y gastos juntos en un unico archivo XLSX desde Estado.
 - Cuentas organizadas por tipos editables, incluidos `Efectivo` y `Cuentas de Banco`.
-- Tipos de cuenta, cuentas y categorias personalizables, ocultables y recuperables.
+- Tipos de cuenta y cuentas personalizables, ocultables y recuperables.
 - Monedas por pais, incluido Sol peruano (`PEN`, `S/`).
 - Importacion y exportacion MMBAK, CSV, JSON y XLSX.
 - Vista previa de importacion con conteos, periodo, duplicados y advertencias antes de reemplazar datos.
@@ -29,7 +30,7 @@ Aplicacion de finanzas personales sin anuncios para Android 10 o superior, acomp
 
 ## Compatibilidad de datos
 
-El importador abre respaldos `.mmbak` SQLite en modo de solo lectura, adapta nombres de tablas y columnas conocidos y conserva cuentas, categorias, notas, fechas y transferencias. Los pares de una transferencia se mantienen internamente para calcular saldos, pero la interfaz y los reportes muestran una sola operacion.
+El importador abre respaldos `.mmbak` SQLite en modo de solo lectura, adapta nombres de tablas y columnas conocidos y conserva cuentas, categorias, descripciones, notas, fechas y transferencias. Las categorias y descripciones se mantienen internamente para no perder compatibilidad con respaldos anteriores, aunque ya no recargan el formulario principal. Los pares de una transferencia se conservan para calcular saldos, pero la interfaz y los reportes muestran una sola operacion.
 
 Tambien se admite `Registro Contable` en XLSX. Las fechas seriales de Excel se convierten a ISO (`AAAA-MM-DD`).
 
