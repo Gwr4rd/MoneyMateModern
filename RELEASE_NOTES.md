@@ -1,26 +1,25 @@
-# Control Financiero 2.3.1
+# Control Financiero 2.4.0
 
-Actualizacion visual de identidad con el nuevo cerdito menta proporcionado para la aplicacion.
+Una interfaz mas directa para registrar y consultar el dinero, sin quitar las funciones de respaldo, sincronizacion ni exportacion.
 
 ## Novedades
 
-- Nuevo icono transparente del lanzador Android, preparado con margen seguro para iconos circulares y cuadrados.
-- Nueva imagen del cerdito en la cabecera y las pantallas internas de Android.
-- Se conserva el dibujo original sin fondos añadidos ni cambios de color.
+- Nuevo movimiento mas breve: importe, cuenta y nota obligatoria a la vista; fecha, hora y descripcion se pueden desplegar. La ultima cuenta usada se recuerda en el dispositivo.
+- Cuentas activas primero, identificadas por su tipo; las transferencias siguen permitiendo mover dinero entre efectivo y bancos.
+- Transacciones con la nota como titulo principal, filtro de periodo compacto y acciones de copiar, editar y eliminar agrupadas.
+- Estado con ingresos, gastos y balance visibles, mas opcion de alternar entre distribucion circular y barras por cuenta.
+- Menu reorganizado en Datos, Sincronizar, Organizar cuentas, Preferencias y Acerca de.
+- Se corrige la fecha local inicial en la web para zonas horarias al oeste de UTC.
 
 ## Compatibilidad
 
-- Mantiene el mismo identificador y certificado de firma de `2.3.0`.
-- Puede instalarse sobre versiones anteriores sin borrar datos, respaldos ni la sesion local.
-- Continuan disponibles los respaldos MMBAK, CSV, JSON y XLSX.
+- Mantiene el mismo identificador y certificado de firma de `2.3.1`, para actualizar sin borrar datos ni la sesion local.
+- Conserva la importacion y exportacion MMBAK, CSV y JSON, el reporte XLSX y la sincronizacion opcional con Supabase.
 
 ## Instalacion
 
-1. Descarga `Control-Financiero-release-signed-v2.3.1.apk`.
-2. Instalala sobre la version anterior.
-3. Android actualizara la aplicacion conservando los datos locales.
+Descarga `Control-Financiero-release-signed-v2.4.0.apk` e instalalo sobre la version anterior.
 
 ## Requisitos
 
 - Android 10 o posterior.
-- La sincronizacion con Supabase continua siendo opcional.

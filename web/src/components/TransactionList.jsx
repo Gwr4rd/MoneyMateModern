@@ -1,4 +1,5 @@
-import { ArrowRightLeft, CircleDollarSign, Copy, Pencil, ReceiptText, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ArrowRightLeft, CircleDollarSign, Copy, MoreHorizontal, Pencil, ReceiptText, Trash2 } from "lucide-react";
 import { currency } from "../lib/finance";
 import { localeFor, t } from "../i18n";
 
@@ -36,6 +37,7 @@ export function TransactionList({ transactions, currencyCode, onEdit, onCopy, on
 }
 
 function TransactionRow({ transaction, currencyCode, onEdit, onCopy, onDelete, language }) {
+  const [expanded, setExpanded] = useState(false);
   const transfer = transaction.kind === "transfer";
   const income = transaction.kind === "income";
   const Icon = transfer ? ArrowRightLeft : income ? CircleDollarSign : ReceiptText;
@@ -46,19 +48,23 @@ function TransactionRow({ transaction, currencyCode, onEdit, onCopy, onDelete, l
     : transaction.account;
   return (
     <article className={`transaction-row ${transaction.kind}`}>
-      <div className="transaction-icon"><Icon size={20} /></div>
-      <div className="transaction-copy">
-        <strong className="transaction-note-primary">{title}</strong>
-        <span className="transaction-meta">{movementLabel} · {accountMeta}</span>
-        {transaction.description ? <span className="transaction-description">{transaction.description}</span> : null}
-      </div>
-      <time>{transaction.time}</time>
-      <strong className="transaction-amount">{currency(transaction.amount, currencyCode)}</strong>
-      <div className="transaction-actions">
-        <button onClick={() => onCopy(transaction)} title={t("Copiar movimiento", language)} aria-label={t("Copiar movimiento", language)}><Copy size={17} /></button>
-        <button onClick={() => onEdit(transaction)} title={t("Editar movimiento", language)} aria-label={t("Editar movimiento", language)}><Pencil size={17} /></button>
-        <button className="danger" onClick={() => onDelete(transaction)} title={t("Eliminar movimiento", language)} aria-label={t("Eliminar movimiento", language)}><Trash2 size={17} /></button>
-      </div>
+      <button type="button" className="transaction-main" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>
+        <span className="transaction-icon"><Icon size={20} /></span>
+        <span className="transaction-copy">
+          <strong className="transaction-note-primary">{title}</strong>
+          <span className="transaction-meta">{movementLabel} · {accountMeta} · {transaction.time}</span>
+        </span>
+        <strong className="transaction-amount">{currency(transaction.amount, currencyCode)}</strong>
+      </button>
+      <details className="transaction-actions">
+        <summary title={t("Acciones", language)} aria-label={t("Acciones", language)}><MoreHorizontal size={20} /></summary>
+        <div className="transaction-action-menu">
+          <button type="button" aria-label={t("Copiar", language)} onClick={() => onCopy(transaction)}><Copy size={17} />{t("Copiar", language)}</button>
+          <button type="button" aria-label={t("Editar", language)} onClick={() => onEdit(transaction)}><Pencil size={17} />{t("Editar", language)}</button>
+          <button type="button" className="danger" aria-label={t("Eliminar", language)} onClick={() => onDelete(transaction)}><Trash2 size={17} />{t("Eliminar", language)}</button>
+        </div>
+      </details>
+      {expanded ? <div className="transaction-detail"><span>{transaction.date} · {transaction.time}</span><span>{accountMeta}</span>{transaction.description ? <span>{transaction.description}</span> : null}</div> : null}
     </article>
   );
 }

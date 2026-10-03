@@ -14,12 +14,14 @@ export function AccountsPanel({
   onAdd,
   onManage,
   onEdit,
+  onSelect,
   onToggleHidden,
   onDelete,
   language,
 }) {
   const hiddenCount = accounts.filter(isHiddenAccount).length;
   const visibleCount = accounts.length - hiddenCount;
+  const totalBalance = accounts.reduce((sum, account) => sum + (account.includeTotal !== false && !account.hidden ? Number(account.currentBalance) || 0 : 0), 0);
   const visible = accounts
     .filter((account) => full && showHidden ? true : !isHiddenAccount(account))
     .sort((left, right) => {
@@ -51,6 +53,7 @@ export function AccountsPanel({
           </div>
         ) : <WalletCards size={22} />}
       </div>
+      {full ? <div className="accounts-balance"><span>{t("Balance", language)}</span><strong>{currency(totalBalance, currencyCode)}</strong></div> : null}
       {groups.map(([name, rows]) => rows.length ? (
         <div className="account-group" key={name}>
           <h3>{t(name, language)}</h3>
@@ -59,16 +62,18 @@ export function AccountsPanel({
             const hidden = isHiddenAccount(account);
             return (
             <article className={`account-row ${hidden ? "hidden" : ""}`} key={account.name}>
-              <div className="account-icon">
-                {account.type === "Efectivo" ? <Banknote size={21} /> : <Landmark size={21} />}
-              </div>
-              <div>
-                <strong>{account.name}</strong>
-                <span>{automatic ? t("Saldo 0.00 · Oculta automáticamente", language) : account.hidden ? t("Oculta manualmente", language) : t(account.type, language)}</span>
-              </div>
-              <strong className={account.currentBalance < 0 ? "negative" : ""}>
-                {currency(account.currentBalance, currencyCode)}
-              </strong>
+              <button type="button" className="account-main" onClick={() => onSelect?.(account)} disabled={!onSelect}>
+                <span className="account-icon">
+                  {account.type === "Efectivo" ? <Banknote size={21} /> : <Landmark size={21} />}
+                </span>
+                <span className="account-copy">
+                  <strong>{account.name}</strong>
+                  <small>{automatic ? t("Saldo 0.00 · Oculta automáticamente", language) : account.hidden ? t("Oculta manualmente", language) : t(account.type, language)}</small>
+                </span>
+                <strong className={`account-balance ${account.currentBalance < 0 ? "negative" : ""}`}>
+                  {currency(account.currentBalance, currencyCode)}
+                </strong>
+              </button>
               {full ? (
                 <div className="account-actions">
                   <button onClick={() => onEdit(account)} title={t("Editar cuenta", language)} aria-label={`${t("Editar", language)} ${account.name}`}><Pencil size={17} /></button>

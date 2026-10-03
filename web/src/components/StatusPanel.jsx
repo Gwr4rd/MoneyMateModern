@@ -1,19 +1,13 @@
-import { useMemo } from "react";
-import { FileSpreadsheet } from "lucide-react";
+import { useMemo, useState } from "react";
+import { BarChart3, FileSpreadsheet, PieChart } from "lucide-react";
 import { accountFlowTotals, currency, inRange, rangeFor, statusSummary } from "../lib/finance";
 import { t } from "../i18n";
+import { PeriodSelect } from "./Filters";
 
-const scopes = [
-  ["anual", "Anual"],
-  ["semestral", "Semestral"],
-  ["mensual", "Mensual"],
-  ["semanal", "Semanal"],
-  ["diario", "Diario"],
-  ["todo", "Todo"],
-];
 const palette = ["#ff3b5c", "#ff8a34", "#ffca28", "#00b894", "#00a8e8", "#3d5afe", "#a855f7", "#ec4899"];
 
 export function StatusPanel({ data, scope, anchor, kind, onScope, onKind, onExport, language, compact = false }) {
+  const [chart, setChart] = useState("distribution");
   const range = useMemo(() => rangeFor(scope, anchor, language), [scope, anchor, language]);
   const rows = useMemo(() => data.transactions.filter((transaction) => inRange(transaction, range)), [data.transactions, range]);
   const totals = useMemo(() => accountFlowTotals(rows, kind), [rows, kind]);
@@ -36,13 +30,20 @@ export function StatusPanel({ data, scope, anchor, kind, onScope, onKind, onExpo
           </div>
         </div>
       </div>
-      <div className="scope-tabs">
-        {scopes.map(([value, label]) => (
-          <button className={scope === value ? "active" : ""} onClick={() => onScope(value)} key={value}>{t(label, language)}</button>
-        ))}
+      <div className="status-controls">
+        {!compact ? <PeriodSelect value={scope} onChange={onScope} language={language} /> : null}
+        <div className="chart-switch" aria-label={t("Grafico", language)}>
+          <button type="button" className={chart === "distribution" ? "active" : ""} onClick={() => setChart("distribution")} aria-label={t("Distribución por cuenta", language)} title={t("Distribución por cuenta", language)}><PieChart size={18} /></button>
+          <button type="button" className={chart === "bars" ? "active" : ""} onClick={() => setChart("bars")} aria-label={t("Barras por cuenta", language)} title={t("Barras por cuenta", language)}><BarChart3 size={18} /></button>
+        </div>
       </div>
-      <p className="chart-caption">{t("Distribución por cuenta", language)}</p>
-      <div className="chart-layout">
+      {!compact ? <div className="status-metrics">
+        <div><span>{t("Ingresos", language)}</span><strong className="income">{currency(summaryValue.income, data.currency)}</strong></div>
+        <div><span>{t("Gastos", language)}</span><strong className="expense">{currency(summaryValue.expense, data.currency)}</strong></div>
+        <div><span>{t("Balance", language)}</span><strong>{currency(summaryValue.balance, data.currency)}</strong></div>
+      </div> : null}
+      <p className="chart-caption">{t(chart === "distribution" ? "Distribución por cuenta" : "Barras por cuenta", language)}</p>
+      {chart === "distribution" ? <div className="chart-layout">
         <div className="donut" style={{ background: gradient }}>
           <div>
             <strong>{currency(kind === "income" ? summaryValue.income : summaryValue.expense, data.currency)}</strong>
@@ -59,7 +60,14 @@ export function StatusPanel({ data, scope, anchor, kind, onScope, onKind, onExpo
             </div>
           )) : <div className="empty-chart">{t("Sin datos en este periodo.", language)}</div>}
         </div>
-      </div>
+      </div> : <div className="status-bars">
+        {totals.length ? totals.map((item, index) => (
+          <div className="status-bar-row" key={item.label}>
+            <div><strong>{item.label}</strong><span>{currency(item.value, data.currency)}</span></div>
+            <div className="status-bar-track"><i style={{ width: `${Math.max(2, item.value * 100 / (totals[0].value || 1))}%`, backgroundColor: palette[index % palette.length] }} /></div>
+          </div>
+        )) : <div className="empty-chart">{t("Sin datos en este periodo.", language)}</div>}
+      </div>}
     </section>
   );
 }

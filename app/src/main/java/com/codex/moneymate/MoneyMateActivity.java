@@ -81,6 +81,7 @@ public class MoneyMateActivity extends Activity {
     private String transactionMode = "diario";
     private String accountMode = "diario";
     private String statsKind = "expense";
+    private boolean statsBars;
     private String statsDetailAccount;
     private String statsScope = "mensual";
     private String statsAnchorDate;
@@ -317,20 +318,15 @@ public class MoneyMateActivity extends Activity {
         menu.setOrientation(LinearLayout.VERTICAL);
         menu.setPadding(dp(10), dp(8), dp(10), dp(8));
         menu.setBackground(rounded(surface, 8, 0, strokeColor));
-        menu.addView(menuItem(R.drawable.ic_menu_period, "Periodo", "Elegir fecha con calendario", v -> closeThen(holder, () -> {
-            if ("stats".equals(screen)) statsDateDialog();
-            else monthDialog();
-        })));
+        menu.addView(menuItem(R.drawable.ic_menu_import, "Datos", "Reportes, importación y respaldos", v -> closeThen(holder, this::dataBackupDialog)));
+        menu.addView(menuItem(R.drawable.ic_menu_sync, "Sincronizar", "Cuenta y datos en Supabase", v -> closeThen(holder, this::supabaseDialog)));
+        menu.addView(menuItem(R.drawable.ic_menu_categories, "Organizar cuentas", "Tipos y cuentas", v -> closeThen(holder, this::accountMetadataDialog)));
         menu.addView(menuItem(R.drawable.ic_menu_settings, "Preferencias", "Idioma, moneda y apariencia", v -> closeThen(holder, this::preferencesDialog)));
-        menu.addView(menuItem(R.drawable.ic_menu_categories, "Organizar cuentas", "Tipos y cuentas en un solo lugar", v -> closeThen(holder, this::accountTypeDialog)));
-        menu.addView(menuItem(R.drawable.ic_menu_report, "Generar reporte", "Semanal, mensual, anual o todo", v -> closeThen(holder, this::reportDialog)));
-        menu.addView(menuItem(R.drawable.ic_menu_sync, "Sincronizar", "Subir o descargar desde Supabase", v -> closeThen(holder, this::supabaseDialog)));
-        menu.addView(menuItem(R.drawable.ic_menu_import, "Datos y respaldos", "Importar o exportar archivos", v -> closeThen(holder, this::dataBackupDialog)));
         menu.addView(menuItem(R.drawable.ic_menu_settings, "Acerca de", "Nombre, version y desarrollador", v -> closeThen(holder, this::aboutDialog)));
         ScrollView menuScroll = new ScrollView(this);
         menuScroll.setFillViewport(false);
         menuScroll.addView(menu);
-        int popupHeight = Math.min(dp(420), getResources().getDisplayMetrics().heightPixels - dp(120));
+        int popupHeight = Math.min(dp(330), getResources().getDisplayMetrics().heightPixels - dp(120));
         holder[0] = new PopupWindow(menuScroll, dp(296), popupHeight, true);
         holder[0].setOutsideTouchable(true);
         holder[0].setBackgroundDrawable(rounded(surface, 8, 0, strokeColor));
@@ -362,6 +358,7 @@ public class MoneyMateActivity extends Activity {
         box.setPadding(dp(12), dp(6), dp(12), dp(6));
         box.addView(iconSmallButton("Importar datos", R.drawable.ic_menu_import, v -> closeThen(holder, this::openImport)), margins(-1, dp(50), 0, 6));
         box.addView(iconSmallButton("Exportar respaldo", R.drawable.ic_menu_export, v -> closeThen(holder, this::openExport)), margins(-1, dp(50), 0, 6));
+        box.addView(iconSmallButton("Generar reporte", R.drawable.ic_menu_report, v -> closeThen(holder, this::reportDialog)), margins(-1, dp(50), 0, 6));
         box.addView(iconSmallButton("Revisar integridad", R.drawable.ic_menu_settings, v -> closeThen(holder, this::integrityDialog)), margins(-1, dp(50), 0, 6));
         File recovery = importRecoveryFile();
         if (recovery.isFile()) {
@@ -515,18 +512,24 @@ public class MoneyMateActivity extends Activity {
         content.addView(dataStatusStrip(s));
         content.addView(topAction("Nuevo movimiento", v -> movementDialog(null)));
 
+        LinearLayout filters = new LinearLayout(this);
+        filters.setOrientation(LinearLayout.HORIZONTAL);
         Button search = searchModeButton();
-        search.setText(ui("Buscar notas, cuentas, fechas o importes"));
-        content.addView(search, margins(-1, dp(40), 0, 7));
-
-        LinearLayout modes = new LinearLayout(this);
-        modes.setOrientation(LinearLayout.HORIZONTAL);
-        modes.addView(modeButton("Anual", "anual"), pillParams(false));
-        modes.addView(modeButton("Mensual", "mensual"), pillParams(false));
-        modes.addView(modeButton("Semanal", "semanal"), pillParams(false));
-        modes.addView(modeButton("Diario", "diario"), pillParams(false));
-        modes.addView(modeButton("Total", "todo"), pillParams(true));
-        content.addView(modes);
+        search.setText(ui("Buscar"));
+        filters.addView(search, new LinearLayout.LayoutParams(0, dp(42), 1));
+        Button scope = smallButton(ui("buscar".equals(transactionMode) ? "Buscar" : scopeLabel(transactionMode)), v -> transactionScopeDialog());
+        setButtonIcon(scope, R.drawable.ic_action_filter, actionColor);
+        scope.setBackground(rounded(actionSoft, 8, 0, strokeColor));
+        LinearLayout.LayoutParams scopeParams = new LinearLayout.LayoutParams(dp(118), dp(42));
+        scopeParams.setMargins(dp(8), 0, 0, 0);
+        filters.addView(scope, scopeParams);
+        content.addView(filters, margins(-1, dp(42), 0, 6));
+        if (!"todo".equals(transactionMode) && !"buscar".equals(transactionMode)) {
+            TextView dateFilter = text(selectedRange.label, 12, true, muted);
+            dateFilter.setPadding(dp(5), dp(4), dp(5), dp(9));
+            dateFilter.setOnClickListener(v -> transactionDateDialog());
+            content.addView(dateFilter);
+        }
 
         if ("buscar".equals(transactionMode)) content.addView(activeSearchStrip(rows.size()));
         renderTransactionRows(rows, false);
@@ -658,20 +661,27 @@ public class MoneyMateActivity extends Activity {
         content.addView(statsTotalsHeader(s));
         content.addView(statusExportAction());
 
-        PieChartView pie = new PieChartView(this);
-        pie.setData(bars);
-        pie.setThemeColors(textColor, muted, surface2);
-        pie.setCenterText(String.valueOf(bars.size()), ui(bars.size() == 1 ? "Cuenta" : "Cuentas"));
-        pie.setContentDescription(ui("Distribución por cuenta"));
-
         LinearLayout pieBox = panel();
-        pieBox.addView(text("Distribución por cuenta", 16, true, textColor));
-        TextView chartHint = text("Participación de cada cuenta en el periodo", 12, false, muted);
-        chartHint.setPadding(0, dp(3), 0, 0);
-        pieBox.addView(chartHint);
-        if (bars.isEmpty()) {
-            pieBox.addView(empty("Sin datos en este periodo."));
-        } else {
+        LinearLayout chartHeader = new LinearLayout(this);
+        chartHeader.setOrientation(LinearLayout.HORIZONTAL);
+        chartHeader.setGravity(Gravity.CENTER_VERTICAL);
+        chartHeader.addView(text(statsBars ? "Barras por cuenta" : "Distribución por cuenta", 16, true, textColor), new LinearLayout.LayoutParams(0, -2, 1));
+        ImageButton chartSwitch = iconButton(statsBars ? R.drawable.ic_nav_status : R.drawable.ic_menu_report, v -> {
+            statsBars = !statsBars;
+            renderScreen();
+        });
+        chartSwitch.setContentDescription(ui(statsBars ? "Distribución por cuenta" : "Barras por cuenta"));
+        chartSwitch.setColorFilter(actionColor);
+        chartSwitch.setBackground(rounded(controlSurface(), 8, 0, strokeColor));
+        chartHeader.addView(chartSwitch, new LinearLayout.LayoutParams(dp(42), dp(38)));
+        pieBox.addView(chartHeader);
+        if (bars.isEmpty()) pieBox.addView(empty("Sin datos en este periodo."));
+        else if (!statsBars) {
+            PieChartView pie = new PieChartView(this);
+            pie.setData(bars);
+            pie.setThemeColors(textColor, muted, surface2);
+            pie.setCenterText(String.valueOf(bars.size()), ui(bars.size() == 1 ? "Cuenta" : "Cuentas"));
+            pie.setContentDescription(ui("Distribución por cuenta"));
             pieBox.addView(pie, new LinearLayout.LayoutParams(-1, dp(184)));
             animateChart(pie);
         }
@@ -818,6 +828,10 @@ public class MoneyMateActivity extends Activity {
         LinearLayout.LayoutParams expenseParams = new LinearLayout.LayoutParams(0, dp(68), 1);
         expenseParams.setMargins(dp(5), 0, 0, 0);
         box.addView(expense, expenseParams);
+        TextView balance = statsMetricTab("Balance", money(s.balance), textColor, false);
+        LinearLayout.LayoutParams balanceParams = new LinearLayout.LayoutParams(0, dp(68), 1);
+        balanceParams.setMargins(dp(5), 0, 0, 0);
+        box.addView(balance, balanceParams);
         return box;
     }
 
@@ -827,7 +841,7 @@ public class MoneyMateActivity extends Activity {
         SpannableString span = new SpannableString(full);
         span.setSpan(new ForegroundColorSpan(selected ? color : muted), 0, translated.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         int valueStart = translated.length() + 1;
-        span.setSpan(new ForegroundColorSpan(selected ? textColor : muted), valueStart, full.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        span.setSpan(new ForegroundColorSpan(selected || "Balance".equals(label) ? textColor : muted), valueStart, full.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         span.setSpan(new StyleSpan(Typeface.BOLD), valueStart, full.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         span.setSpan(new RelativeSizeSpan(1.24f), valueStart, full.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         TextView view = text("", 13, false, textColor);
@@ -1259,21 +1273,16 @@ public class MoneyMateActivity extends Activity {
         amount.setLayoutParams(margins(-1, dp(60), 0, 10));
         if (copyFrom != null) amount.setText(String.format(Locale.US, "%.2f", copyFrom.amount));
         List<AccountSelectionOption> accountChoices = movementAccountChoices();
-        List<String> accountTypes = db.accountTypes();
-        if (accountTypes.isEmpty()) accountTypes.add("Cuentas de Banco");
-        String initialAccountName = copyFrom == null ? "" : (copyFrom.isTransfer() && !copyFrom.transferFrom.isEmpty() ? copyFrom.transferFrom : copyFrom.account);
+        String initialAccountName = copyFrom == null ? prefs.getString("last_movement_account", "")
+                : (copyFrom.isTransfer() && !copyFrom.transferFrom.isEmpty() ? copyFrom.transferFrom : copyFrom.account);
         String initialToAccountName = copyFrom == null ? "" : copyFrom.transferTo;
-        String initialAccountType = accountTypeForName(accountChoices, initialAccountName, accountTypes.get(0));
-        String initialToAccountType = accountTypeForName(accountChoices, initialToAccountName, accountTypes.get(0));
-        Spinner accountType = spinner(new ArrayList<>(accountTypes));
-        Spinner toAccountType = spinner(new ArrayList<>(accountTypes));
-        setSpinnerSelection(accountType, initialAccountType);
-        setSpinnerSelection(toAccountType, initialToAccountType);
-        Spinner account = accountSpinner(accountChoicesForType(accountChoices, initialAccountType));
-        Spinner toAccount = accountSpinner(accountChoicesForType(accountChoices, initialToAccountType));
+        Spinner account = accountSpinner(accountChoices);
+        Spinner toAccount = accountSpinner(accountChoices);
         setSpinnerSelection(account, initialAccountName);
         setSpinnerSelection(toAccount, initialToAccountName);
-        if (copyFrom == null && toAccount.getCount() > 1) toAccount.setSelection(1);
+        if (copyFrom == null && toAccount.getCount() > 1 && toAccount.getSelectedItem().toString().equals(account.getSelectedItem().toString())) {
+            toAccount.setSelection(1);
+        }
         Spinner category = spinner(labels(copyFrom == null ? "Gasto" : copyFrom.category));
         AutoCompleteTextView note = noteInput(db.recentNotes());
         note.setTextSize(16);
@@ -1300,28 +1309,42 @@ public class MoneyMateActivity extends Activity {
         type.setVisibility(View.GONE);
         form.addView(type, new LinearLayout.LayoutParams(1, 1));
 
-        form.addView(label("Fecha y hora"));
+        form.addView(label("Importe"));
+        form.addView(amount);
+        TextView dateTimeToggle = text("", 13, true, actionColor);
+        dateTimeToggle.setPadding(dp(12), dp(10), dp(12), dp(10));
+        dateTimeToggle.setBackground(rounded(controlSurface(), 8, 0, strokeColor));
+        form.addView(dateTimeToggle, margins(-1, -2, 0, 8));
         LinearLayout dateTime = new LinearLayout(this);
         dateTime.setOrientation(LinearLayout.HORIZONTAL);
         dateTime.addView(date, new LinearLayout.LayoutParams(0, dp(48), 3));
         LinearLayout.LayoutParams timeParams = new LinearLayout.LayoutParams(0, dp(48), 2);
         timeParams.setMargins(dp(8), 0, 0, 0);
         dateTime.addView(time, timeParams);
-        form.addView(dateTime);
+        LinearLayout advanced = new LinearLayout(this);
+        advanced.setOrientation(LinearLayout.VERTICAL);
+        advanced.addView(dateTime);
+        advanced.addView(label("Descripcion"));
+        advanced.addView(description);
+        form.addView(advanced);
+        advanced.setVisibility(copyFrom == null ? View.GONE : View.VISIBLE);
+        dateTimeToggle.setText(ui("Fecha y hora") + "  ·  " + date.getText() + "  " + time.getText());
+        dateTimeToggle.setOnClickListener(v -> advanced.setVisibility(advanced.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+        android.text.TextWatcher dateTimeWatcher = new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                dateTimeToggle.setText(ui("Fecha y hora") + "  ·  " + date.getText() + "  " + time.getText());
+            }
+            @Override public void afterTextChanged(android.text.Editable s) { }
+        };
+        date.addTextChangedListener(dateTimeWatcher);
+        time.addTextChangedListener(dateTimeWatcher);
 
-        form.addView(label("Importe"));
-        form.addView(amount);
         TextView accountLabel = label("Cuenta");
-        TextView accountTypeLabel = label("Tipo de cuenta");
-        TextView toAccountTypeLabel = label("Tipo de destino");
         TextView toAccountLabel = label("Cuenta destino");
         TextView categoryLabel = label("Categoria");
-        form.addView(accountTypeLabel);
-        form.addView(accountType);
         form.addView(accountLabel);
         form.addView(account);
-        form.addView(toAccountTypeLabel);
-        form.addView(toAccountType);
         form.addView(toAccountLabel);
         form.addView(toAccount);
         TextView noteLabel = label("Nota obligatoria");
@@ -1332,8 +1355,7 @@ public class MoneyMateActivity extends Activity {
         type.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                applyMovementType(position, typeButtons, accountLabel, accountTypeLabel, accountType,
-                        toAccountTypeLabel, toAccountType, toAccountLabel, toAccount, categoryLabel, category);
+                applyMovementType(position, typeButtons, accountLabel, toAccountLabel, toAccount, categoryLabel, category);
             }
 
             @Override
@@ -1342,49 +1364,22 @@ public class MoneyMateActivity extends Activity {
         });
         incomeType.setOnClickListener(v -> {
             type.setSelection(1);
-            applyMovementType(1, typeButtons, accountLabel, accountTypeLabel, accountType,
-                    toAccountTypeLabel, toAccountType, toAccountLabel, toAccount, categoryLabel, category);
+            applyMovementType(1, typeButtons, accountLabel, toAccountLabel, toAccount, categoryLabel, category);
         });
         expenseType.setOnClickListener(v -> {
             type.setSelection(0);
-            applyMovementType(0, typeButtons, accountLabel, accountTypeLabel, accountType,
-                    toAccountTypeLabel, toAccountType, toAccountLabel, toAccount, categoryLabel, category);
+            applyMovementType(0, typeButtons, accountLabel, toAccountLabel, toAccount, categoryLabel, category);
         });
         transferType.setOnClickListener(v -> {
             type.setSelection(2);
-            applyMovementType(2, typeButtons, accountLabel, accountTypeLabel, accountType,
-                    toAccountTypeLabel, toAccountType, toAccountLabel, toAccount, categoryLabel, category);
+            applyMovementType(2, typeButtons, accountLabel, toAccountLabel, toAccount, categoryLabel, category);
         });
-        accountType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String preferred = account.getSelectedItem() == null ? initialAccountName : account.getSelectedItem().toString();
-                setAccountSpinnerChoices(account, accountChoicesForType(accountChoices, parent.getItemAtPosition(position).toString()), preferred);
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-            }
-        });
-        toAccountType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String preferred = toAccount.getSelectedItem() == null ? initialToAccountName : toAccount.getSelectedItem().toString();
-                setAccountSpinnerChoices(toAccount, accountChoicesForType(accountChoices, parent.getItemAtPosition(position).toString()), preferred);
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-            }
-        });
-        applyMovementType(0, typeButtons, accountLabel, accountTypeLabel, accountType,
-                toAccountTypeLabel, toAccountType, toAccountLabel, toAccount, categoryLabel, category);
+        applyMovementType(0, typeButtons, accountLabel, toAccountLabel, toAccount, categoryLabel, category);
 
         if (copyFrom != null) {
             int mode = MovementFormRules.positionFor(copyFrom.kind, copyFrom.isTransfer());
             type.setSelection(mode);
-            applyMovementType(mode, typeButtons, accountLabel, accountTypeLabel, accountType,
-                    toAccountTypeLabel, toAccountType, toAccountLabel, toAccount, categoryLabel, category);
+            applyMovementType(mode, typeButtons, accountLabel, toAccountLabel, toAccount, categoryLabel, category);
             if (mode != 2) {
                 category.setAdapter(stringAdapter(labels(copyFrom.category)));
                 setSpinnerSelection(account, copyFrom.account);
@@ -1510,8 +1505,24 @@ public class MoneyMateActivity extends Activity {
         }
         period = d.length() >= 7 ? d.substring(0, 7) : period;
         transactionAnchorDate = d;
+        prefs.edit().putString("last_movement_account", account.getSelectedItem().toString()).apply();
         markLocalDataChanged();
         return true;
+    }
+
+    private void transactionScopeDialog() {
+        String[] labels = labels("Diario", "Semanal", "Mensual", "Anual", "Todo").toArray(new String[0]);
+        String[] values = {"diario", "semanal", "mensual", "anual", "todo"};
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(ui("Periodo"))
+                .setItems(labels, (d, which) -> {
+                    transactionMode = values[which];
+                    renderScreen();
+                })
+                .setNegativeButton(ui("Cancelar"), null)
+                .create();
+        dialog.show();
+        styleDialog(dialog);
     }
 
     private String movementCategory(Spinner category, String kind) {
@@ -3679,15 +3690,10 @@ public class MoneyMateActivity extends Activity {
         }
     }
 
-    private void applyMovementType(int position, Button[] buttons, TextView accountLabel, TextView accountTypeLabel,
-                                   Spinner accountType, TextView toAccountTypeLabel, Spinner toAccountType,
+    private void applyMovementType(int position, Button[] buttons, TextView accountLabel,
                                    TextView toAccountLabel, Spinner toAccount, TextView categoryLabel, Spinner category) {
         MovementFormRule rule = MovementFormRules.forPosition(position);
         accountLabel.setText(ui(rule.accountLabel));
-        accountTypeLabel.setText(ui(rule.showDestination ? "Tipo de origen" : "Tipo de cuenta"));
-        accountType.setVisibility(View.VISIBLE);
-        toAccountTypeLabel.setVisibility(rule.showDestination ? View.VISIBLE : View.GONE);
-        toAccountType.setVisibility(rule.showDestination ? View.VISIBLE : View.GONE);
         toAccountLabel.setVisibility(rule.showDestination ? View.VISIBLE : View.GONE);
         toAccount.setVisibility(rule.showDestination ? View.VISIBLE : View.GONE);
         categoryLabel.setVisibility(View.GONE);
@@ -3733,6 +3739,8 @@ public class MoneyMateActivity extends Activity {
             ));
         }
         Collections.sort(choices, Comparator.comparingInt((AccountSelectionOption choice) -> choice.active ? 0 : 1)
+                .thenComparingInt(choice -> "Efectivo".equals(choice.type) ? 0 : ("Cuentas de Banco".equals(choice.type) ? 1 : 2))
+                .thenComparing(choice -> choice.type.toLowerCase(Locale.US))
                 .thenComparing(choice -> choice.name.toLowerCase(Locale.US)));
         return choices;
     }
@@ -3786,7 +3794,7 @@ public class MoneyMateActivity extends Activity {
 
     private void styleAccountSpinnerText(TextView item, AccountSelectionOption account, boolean dropdown) {
         String status = ui(account.active ? "Activa" : "Inactiva");
-        String value = account.name + "  ·  " + status;
+        String value = account.name + "  ·  " + (dropdown ? account.type + "  ·  " : "") + status;
         SpannableString styled = new SpannableString(value);
         int statusStart = value.length() - status.length();
         styled.setSpan(new ForegroundColorSpan(account.active ? actionColor : muted), statusStart, value.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);

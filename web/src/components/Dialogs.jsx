@@ -30,12 +30,14 @@ function AccountSelect({ label, name, value, accounts, onChange, language }) {
   const selected = accounts.find((account) => account.name === value);
   const activeAccounts = accounts.filter((account) => account.active);
   const inactiveAccounts = accounts.filter((account) => !account.active);
-
-  const options = (items) => items.map((account) => (
-    <option value={account.name} key={account.name}>
-      {account.name} · {t(account.active ? "Activa" : "Inactiva", language)}
-    </option>
-  ));
+  const byType = (items, status) => [...new Set(items.map((account) => account.type || "Cuentas de Banco"))]
+    .map((type) => (
+      <optgroup label={`${t(type, language)} · ${t(status, language)}`} key={`${status}-${type}`}>
+        {items.filter((account) => (account.type || "Cuentas de Banco") === type).map((account) => (
+          <option value={account.name} key={account.name}>{account.name}</option>
+        ))}
+      </optgroup>
+    ));
 
   return (
     <label>{t(label, language)}
@@ -45,8 +47,8 @@ function AccountSelect({ label, name, value, accounts, onChange, language }) {
         value={value}
         onChange={onChange}
       >
-        {activeAccounts.length ? <optgroup label={t("Cuentas activas", language)}>{options(activeAccounts)}</optgroup> : null}
-        {inactiveAccounts.length ? <optgroup label={t("Cuentas inactivas", language)}>{options(inactiveAccounts)}</optgroup> : null}
+        {byType(activeAccounts, "Activa")}
+        {byType(inactiveAccounts, "Inactiva")}
       </select>
     </label>
   );
@@ -62,33 +64,24 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
       originalIndex: index,
     }))
     .sort((left, right) => Number(right.active) - Number(left.active) || left.originalIndex - right.originalIndex), [data]);
-  const accountTypes = useMemo(() => [...new Set([
-    ...(data.accountTypes || []),
-    ...availableAccounts.map((account) => account.type),
-  ].filter(Boolean))], [data.accountTypes, availableAccounts]);
-  const defaultAccount = initial?.account || availableAccounts[0]?.name || "";
+  const lastAccount = window.localStorage.getItem("moneymate-last-account");
+  const defaultAccount = initial?.account || availableAccounts.find((account) => account.name === lastAccount)?.name || availableAccounts[0]?.name || "";
   const defaultToAccount = initial?.toAccount
     || availableAccounts.find((account) => account.name !== defaultAccount)?.name
     || "";
-  const defaultAccountType = availableAccounts.find((account) => account.name === defaultAccount)?.type || accountTypes[0] || "";
-  const defaultToAccountType = availableAccounts.find((account) => account.name === defaultToAccount)?.type || accountTypes[0] || "";
   const [showNoteSuggestions, setShowNoteSuggestions] = useState(false);
   const [noteError, setNoteError] = useState(false);
   const [form, setForm] = useState({
     date: mode === "copy" ? today() : initial?.date || today(),
     time: mode === "copy" ? new Date().toTimeString().slice(0, 5) : initial?.time || new Date().toTimeString().slice(0, 5),
     kind: initial?.kind || "expense",
-    accountType: defaultAccountType,
     account: defaultAccount,
-    toAccountType: defaultToAccountType,
     toAccount: defaultToAccount,
     category: initial?.category || automaticCategory("expense"),
     amount: initial?.amount ?? "",
     note: initial?.note || "",
     description: initial?.description || "",
   });
-  const filteredAccounts = availableAccounts.filter((account) => account.type === form.accountType);
-  const filteredToAccounts = availableAccounts.filter((account) => account.type === form.toAccountType);
   const previousNotes = useMemo(() => {
     const seen = new Set();
     return data.transactions.reduce((notes, transaction) => {
@@ -118,14 +111,6 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
       if (name === "kind" && value !== "transfer") {
         next.category = initial?.kind === value && initial?.category ? initial.category : automaticCategory(value);
       }
-      if (name === "accountType") {
-        const choices = availableAccounts.filter((account) => account.type === value);
-        if (!choices.some((account) => account.name === next.account)) next.account = choices[0]?.name || "";
-      }
-      if (name === "toAccountType") {
-        const choices = availableAccounts.filter((account) => account.type === value);
-        if (!choices.some((account) => account.name === next.toAccount)) next.toAccount = choices[0]?.name || "";
-      }
       return next;
     });
   }
@@ -137,12 +122,12 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
       return;
     }
     if (!Number(form.amount) || Number(form.amount) <= 0) return;
-    if (!form.account || !filteredAccounts.some((account) => account.name === form.account)) return;
-    if (form.kind === "transfer" && (!form.toAccount || !filteredToAccounts.some((account) => account.name === form.toAccount))) return;
+    if (!form.account || !availableAccounts.some((account) => account.name === form.account)) return;
+    if (form.kind === "transfer" && (!form.toAccount || !availableAccounts.some((account) => account.name === form.toAccount))) return;
     if (form.kind === "transfer" && form.account === form.toAccount) return;
-    const { accountType, toAccountType, ...movement } = form;
+    window.localStorage.setItem("moneymate-last-account", form.account);
     onSave({
-      ...movement,
+      ...form,
       id: mode === "edit" ? initial.id : crypto.randomUUID(),
       amount: Number(form.amount),
       category: form.kind === "transfer" ? "Transferencia" : (form.category || automaticCategory(form.kind)),
@@ -180,35 +165,23 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
           ))}
         </fieldset>
         <label className="amount-field">{t("Importe", language)}<input name="amount" type="number" min="0.01" step="0.01" value={form.amount} onChange={change} inputMode="decimal" autoFocus /></label>
-        <div className="form-pair compact-date-time">
-          <label>{t("Fecha", language)}<input name="date" type="date" value={form.date} onChange={change} /></label>
-          <label>{t("Hora", language)}<input name="time" type="time" value={form.time} onChange={change} /></label>
-        </div>
+        <details className="movement-more" open={mode === "edit" || mode === "copy"}>
+          <summary>{t("Fecha y hora", language)} · {form.date} {form.time}</summary>
+          <div className="form-pair compact-date-time">
+            <label>{t("Fecha", language)}<input name="date" type="date" value={form.date} onChange={change} /></label>
+            <label>{t("Hora", language)}<input name="time" type="time" value={form.time} onChange={change} /></label>
+          </div>
+        </details>
         {form.kind === "transfer" ? (
           <div className="account-route">
             <strong className="route-title">{t("Cuenta origen", language)}</strong>
-            <label>{t("Tipo de origen", language)}
-              <select name="accountType" value={form.accountType} onChange={change}>
-                {accountTypes.map((value) => <option value={value} key={value}>{t(value, language)}</option>)}
-              </select>
-            </label>
-            <AccountSelect label="Cuenta origen" name="account" value={form.account} accounts={filteredAccounts} onChange={change} language={language} />
+            <AccountSelect label="Cuenta origen" name="account" value={form.account} accounts={availableAccounts} onChange={change} language={language} />
             <strong className="route-title destination">{t("Cuenta destino", language)}</strong>
-            <label>{t("Tipo de destino", language)}
-              <select name="toAccountType" value={form.toAccountType} onChange={change}>
-                {accountTypes.map((value) => <option value={value} key={value}>{t(value, language)}</option>)}
-              </select>
-            </label>
-            <AccountSelect label="Cuenta destino" name="toAccount" value={form.toAccount} accounts={filteredToAccounts} onChange={change} language={language} />
+            <AccountSelect label="Cuenta destino" name="toAccount" value={form.toAccount} accounts={availableAccounts} onChange={change} language={language} />
           </div>
         ) : (
           <div className="account-route single">
-            <label>{t("Tipo de cuenta", language)}
-              <select name="accountType" value={form.accountType} onChange={change}>
-                {accountTypes.map((value) => <option value={value} key={value}>{t(value, language)}</option>)}
-              </select>
-            </label>
-            <AccountSelect label="Cuenta" name="account" value={form.account} accounts={filteredAccounts} onChange={change} language={language} />
+            <AccountSelect label="Cuenta" name="account" value={form.account} accounts={availableAccounts} onChange={change} language={language} />
           </div>
         )}
         <label className={`note-field ${noteError ? "has-error" : ""}`}>{t("Nota obligatoria", language)}

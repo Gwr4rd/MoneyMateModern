@@ -22,9 +22,9 @@ const navItems = [
   { id: "accounts", label: "Cuentas", icon: WalletCards },
 ];
 
-export function Header({ active, dark, language, onNav, onTheme, onCurrency, onSearch, onNew, onReport, onData, onSync, onLanguage, onAbout }) {
+export function Header({ active, dark, language, onNav, onTheme, onCurrency, onSearch, onNew, onReport, onData, onSync, onManage, onLanguage, onAbout }) {
   const mobileAction = (action) => (event) => {
-    event.currentTarget.closest("details")?.removeAttribute("open");
+    event.currentTarget.closest(".mobile-overflow")?.removeAttribute("open");
     action();
   };
   return (
@@ -44,24 +44,22 @@ export function Header({ active, dark, language, onNav, onTheme, onCurrency, onS
           <Plus size={19} />
           <span>{t("Nuevo movimiento", language)}</span>
         </button>
-        <IconAction className="desktop-action" icon={FileSpreadsheet} label={t("Reporte", language)} onClick={onReport} />
-        <IconAction className="desktop-action" icon={DatabaseBackup} label={t("Datos", language)} onClick={onData} />
-        <IconAction className="desktop-action" icon={RefreshCw} label={t("Sincronizar", language)} onClick={onSync} />
-        <IconAction className="desktop-action" icon={Banknote} label={t("Moneda", language)} onClick={onCurrency} />
-        <IconAction className="desktop-action" icon={Languages} label={t("Idioma", language)} onClick={onLanguage} />
-        <IconAction className="desktop-action" icon={Info} label={t("Acerca de", language)} onClick={onAbout} />
-        <button className="icon-only desktop-theme" onClick={onTheme} title={t(dark ? "Modo claro" : "Modo oscuro", language)} aria-label={t(dark ? "Modo claro" : "Modo oscuro", language)}>
-          {dark ? <Sun size={21} /> : <CloudMoon size={22} />}
-        </button>
         <details className="mobile-overflow">
           <summary aria-label={t("Abrir menu", language)}><MoreVertical size={25} /></summary>
           <div>
-            <button onClick={mobileAction(onTheme)}>{dark ? <Sun size={20} /> : <CloudMoon size={20} />} {t(dark ? "Modo claro" : "Modo oscuro", language)}</button>
-            <button onClick={mobileAction(onCurrency)}><Banknote size={20} /> {t("Moneda y pais", language)}</button>
-            <button onClick={mobileAction(onLanguage)}><Languages size={20} /> {t("Idioma", language)}</button>
-            <button onClick={mobileAction(onReport)}><FileSpreadsheet size={20} /> {t("Generar reporte", language)}</button>
-            <button onClick={mobileAction(onData)}><DatabaseBackup size={20} /> {t("Datos y respaldos", language)}</button>
+            <details className="menu-group">
+              <summary><DatabaseBackup size={20} /> {t("Datos", language)}</summary>
+              <button onClick={mobileAction(onReport)}><FileSpreadsheet size={18} /> {t("Generar reporte", language)}</button>
+              <button onClick={mobileAction(onData)}><DatabaseBackup size={18} /> {t("Datos y respaldos", language)}</button>
+            </details>
             <button onClick={mobileAction(onSync)}><RefreshCw size={20} /> {t("Sincronizar", language)}</button>
+            <button onClick={mobileAction(onManage)}><ListTree size={20} /> {t("Organizar cuentas", language)}</button>
+            <details className="menu-group">
+              <summary><CloudMoon size={20} /> {t("Preferencias", language)}</summary>
+              <button onClick={mobileAction(onTheme)}>{dark ? <Sun size={18} /> : <CloudMoon size={18} />} {t(dark ? "Modo claro" : "Modo oscuro", language)}</button>
+              <button onClick={mobileAction(onCurrency)}><Banknote size={18} /> {t("Moneda y pais", language)}</button>
+              <button onClick={mobileAction(onLanguage)}><Languages size={18} /> {t("Idioma", language)}</button>
+            </details>
             <button onClick={mobileAction(onAbout)}><Info size={20} /> {t("Acerca de", language)}</button>
           </div>
         </details>

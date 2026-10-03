@@ -460,6 +460,7 @@ export default function App() {
         onReport={() => setDialog("report")}
         onData={() => setDialog("backup")}
         onSync={() => { setSyncMessage(""); setDialog("sync"); }}
+        onManage={() => { navigate("accounts"); setDialog("metadata"); }}
         onLanguage={() => setDialog("language")}
         onAbout={() => setDialog("about")}
       />
@@ -473,18 +474,13 @@ export default function App() {
               <div ref={searchRef}>
                 <Filters
                   filters={filters}
-                  accounts={data.accounts.filter((account) => !account.hidden)}
+                  accounts={data.accounts}
+                  scope={scope}
+                  onScope={setScope}
                   onChange={setFilters}
-                  onClear={() => setFilters({ query: "", account: "", anchor: today() })}
+                  onClear={() => { setFilters({ query: "", account: "", anchor: today() }); setScope("mensual"); }}
                   language={language}
                 />
-              </div>
-              <div className="scope-row">
-                {["anual", "mensual", "semanal", "diario", "todo"].map((value) => (
-                  <button className={scope === value ? "active" : ""} onClick={() => setScope(value)} key={value}>
-                    {t(scopeLabel(value), language)}
-                  </button>
-                ))}
               </div>
               <TransactionList
                 transactions={visibleTransactions}
@@ -520,6 +516,11 @@ export default function App() {
               onEdit={(account) => setDialog({ type: "account", item: account })}
               onToggleHidden={toggleAccountHidden}
               onDelete={deleteAccount}
+              onSelect={(account) => {
+                setFilters((current) => ({ ...current, account: account.name, query: "" }));
+                setScope("todo");
+                navigate("transactions");
+              }}
               language={language}
             />
           ) : null}
@@ -535,7 +536,11 @@ export default function App() {
             compact
             language={language}
           />
-          <AccountsPanel accounts={accounts} currencyCode={data.currency} language={language} />
+          <AccountsPanel accounts={accounts} currencyCode={data.currency} onSelect={(account) => {
+            setFilters((current) => ({ ...current, account: account.name, query: "" }));
+            setScope("todo");
+            navigate("transactions");
+          }} language={language} />
         </aside>
       </div>
       <MobileNav active={active} onChange={navigate} language={language} />
