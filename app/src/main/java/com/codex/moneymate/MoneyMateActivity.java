@@ -259,7 +259,9 @@ public class MoneyMateActivity extends Activity {
             else monthDialog();
         });
         top.addView(headerTitle, new LinearLayout.LayoutParams(0, dp(50), 1));
-        top.addView(topIcon("⋮", v -> menuDialog(v)), new LinearLayout.LayoutParams(dp(44), dp(48)));
+        Button more = topIcon("⋮", this::menuDialog);
+        more.setContentDescription(ui("Opciones"));
+        top.addView(more, new LinearLayout.LayoutParams(dp(44), dp(48)));
         return top;
     }
 
@@ -345,63 +347,82 @@ public class MoneyMateActivity extends Activity {
 
     private void menuDialog(View anchor) {
         PopupWindow[] holder = new PopupWindow[1];
-        LinearLayout menu = new LinearLayout(this);
-        menu.setOrientation(LinearLayout.VERTICAL);
-        menu.setPadding(dp(10), dp(8), dp(10), dp(8));
-        menu.setBackground(rounded(surface, 8, 0, strokeColor));
-        menu.addView(menuItem(R.drawable.ic_menu_import, "Datos", "Reportes, importación y respaldos", v -> closeThen(holder, this::dataBackupDialog)));
-        menu.addView(menuItem(R.drawable.ic_menu_sync, "Sincronizar", "Cuenta y datos en Supabase", v -> closeThen(holder, this::supabaseDialog)));
-        menu.addView(menuItem(R.drawable.ic_menu_categories, "Organizar cuentas", "Tipos y cuentas", v -> closeThen(holder, this::accountMetadataDialog)));
-        menu.addView(menuItem(R.drawable.ic_menu_settings, "Preferencias", "Idioma, moneda y apariencia", v -> closeThen(holder, this::preferencesDialog)));
-        menu.addView(menuItem(R.drawable.ic_menu_settings, "Acerca de", "Nombre, version y desarrollador", v -> closeThen(holder, this::aboutDialog)));
-        ScrollView menuScroll = new ScrollView(this);
-        menuScroll.setFillViewport(false);
-        menuScroll.addView(menu);
-        int popupHeight = Math.min(dp(330), getResources().getDisplayMetrics().heightPixels - dp(120));
-        holder[0] = new PopupWindow(menuScroll, dp(296), popupHeight, true);
-        holder[0].setOutsideTouchable(true);
-        holder[0].setBackgroundDrawable(rounded(surface, 8, 0, strokeColor));
-        holder[0].setElevation(0);
-        holder[0].showAsDropDown(anchor, -dp(242), dp(4));
+        LinearLayout menu = actionList(8, 6);
+        addListAction(menu, R.drawable.ic_sheet_archive, "Datos", v -> closeThen(holder, this::dataBackupDialog));
+        addListAction(menu, R.drawable.ic_sheet_cloud, "Sincronizar", v -> closeThen(holder, this::supabaseDialog));
+        addListAction(menu, R.drawable.ic_sheet_wallet, "Organizar cuentas", v -> closeThen(holder, this::accountMetadataDialog));
+        addListAction(menu, R.drawable.ic_sheet_sliders, "Preferencias", v -> closeThen(holder, this::preferencesDialog));
+        addListAction(menu, R.drawable.ic_sheet_info, "Acerca de", v -> closeThen(holder, this::aboutDialog));
+        ScrollView menuScroll = actionScroll(menu);
+        int width = Math.min(dp(248), getResources().getDisplayMetrics().widthPixels - dp(28));
+        PopupWindow popup = new PopupWindow(menuScroll, width, -2, true);
+        holder[0] = popup;
+        popup.setOutsideTouchable(true);
+        popup.setBackgroundDrawable(rounded(withAlpha(surface, 251), 14, 1, strokeColor));
+        popup.setElevation(dp(8));
+        menuScroll.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(popup.getMaxAvailableHeight(anchor, dp(4)), View.MeasureSpec.AT_MOST));
+        popup.setHeight(menuScroll.getMeasuredHeight());
+        popup.showAsDropDown(anchor, 0, dp(4), Gravity.END);
     }
 
     private void preferencesDialog() {
         AlertDialog[] holder = new AlertDialog[1];
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(12), dp(6), dp(12), dp(6));
-        box.addView(iconSmallButton("Idioma", R.drawable.ic_menu_settings, v -> closeThen(holder, this::languageDialog)), margins(-1, dp(50), 0, 6));
-        box.addView(iconSmallButton("Moneda", R.drawable.ic_menu_currency, v -> closeThen(holder, this::currencyDialog)), margins(-1, dp(50), 0, 6));
-        box.addView(iconSmallButton(darkMode ? "Modo claro" : "Modo oscuro", darkMode ? R.drawable.ic_menu_sun : R.drawable.ic_menu_moon_cloud, v -> closeThen(holder, this::toggleTheme)), margins(-1, dp(50), 0, 0));
-        holder[0] = new AlertDialog.Builder(this)
-                .setTitle(ui("Preferencias"))
-                .setView(box)
-                .setNegativeButton(ui("Cerrar"), null)
-                .create();
-        holder[0].show();
-        styleDialog(holder[0]);
+        LinearLayout box = actionList(16, 6);
+        addListAction(box, R.drawable.ic_sheet_globe, "Idioma", v -> closeThen(holder, this::languageDialog));
+        addListAction(box, R.drawable.ic_sheet_banknote, "Moneda", v -> closeThen(holder, this::currencyDialog));
+        addListAction(box, darkMode ? R.drawable.ic_sheet_sun : R.drawable.ic_sheet_moon,
+                darkMode ? "Modo claro" : "Modo oscuro", v -> closeThen(holder, this::toggleTheme));
+        holder[0] = showActionDialog("Preferencias", box);
     }
 
     private void dataBackupDialog() {
         AlertDialog[] holder = new AlertDialog[1];
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(12), dp(6), dp(12), dp(6));
-        box.addView(iconSmallButton("Importar datos", R.drawable.ic_menu_import, v -> closeThen(holder, this::openImport)), margins(-1, dp(50), 0, 6));
-        box.addView(iconSmallButton("Exportar respaldo", R.drawable.ic_menu_export, v -> closeThen(holder, this::openExport)), margins(-1, dp(50), 0, 6));
-        box.addView(iconSmallButton("Generar reporte", R.drawable.ic_menu_report, v -> closeThen(holder, this::reportDialog)), margins(-1, dp(50), 0, 6));
-        box.addView(iconSmallButton("Revisar integridad", R.drawable.ic_menu_settings, v -> closeThen(holder, this::integrityDialog)), margins(-1, dp(50), 0, 6));
-        File recovery = importRecoveryFile();
-        if (recovery.isFile()) {
-            box.addView(iconSmallButton("Deshacer última importación", R.drawable.ic_action_back, v -> closeThen(holder, this::confirmUndoLastImport)), margins(-1, dp(50), 0, 0));
+        LinearLayout box = actionList(16, 6);
+        addListAction(box, R.drawable.ic_sheet_download, "Importar datos", v -> closeThen(holder, this::openImport));
+        addListAction(box, R.drawable.ic_sheet_upload, "Exportar respaldo", v -> closeThen(holder, this::openExport));
+        addListAction(box, R.drawable.ic_sheet_report, "Generar reporte", v -> closeThen(holder, this::reportDialog));
+        addListAction(box, R.drawable.ic_sheet_shield, "Revisar integridad", v -> closeThen(holder, this::integrityDialog));
+        if (importRecoveryFile().isFile()) {
+            addListAction(box, R.drawable.ic_sheet_undo, "Deshacer última importación", v -> closeThen(holder, this::confirmUndoLastImport));
         }
-        holder[0] = new AlertDialog.Builder(this)
-                .setTitle(ui("Datos y respaldos"))
-                .setView(box)
+        holder[0] = showActionDialog("Datos y respaldos", box);
+    }
+
+    private AlertDialog showActionDialog(String title, LinearLayout body) {
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(ui(title))
+                .setView(actionScroll(body))
                 .setNegativeButton(ui("Cerrar"), null)
                 .create();
-        holder[0].show();
-        styleDialog(holder[0]);
+        dialog.show();
+        styleDialog(dialog);
+        return dialog;
+    }
+
+    private ScrollView actionScroll(LinearLayout body) {
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(body);
+        return scroll;
+    }
+
+    private LinearLayout actionList(int horizontalPadding, int verticalPadding) {
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(dp(horizontalPadding), dp(verticalPadding), dp(horizontalPadding), dp(verticalPadding));
+        return list;
+    }
+
+    private void addListAction(LinearLayout list, int icon, String label, View.OnClickListener action) {
+        if (list.getChildCount() > 0) {
+            View divider = new View(this);
+            divider.setBackgroundColor(withAlpha(strokeColor, 145));
+            LinearLayout.LayoutParams line = new LinearLayout.LayoutParams(-1, 1);
+            line.setMarginStart(dp(43));
+            line.setMarginEnd(dp(9));
+            list.addView(divider, line);
+        }
+        list.addView(listAction(icon, label, action), new LinearLayout.LayoutParams(-1, -2));
     }
 
     private void integrityDialog() {
@@ -483,25 +504,21 @@ public class MoneyMateActivity extends Activity {
         }
     }
 
-    private View menuItem(int drawableRes, String title, String subtitle, View.OnClickListener listener) {
-        LinearLayout item = new LinearLayout(this);
-        item.setOrientation(LinearLayout.HORIZONTAL);
-        item.setGravity(Gravity.CENTER_VERTICAL);
-        item.setPadding(dp(8), dp(5), dp(8), dp(5));
-        item.setBackground(rounded(surface2, 8, 0, strokeColor));
-        item.setLayoutParams(margins(-1, -2, 0, 4));
-        Drawable drawable = getResources().getDrawable(drawableRes).mutate();
-        drawable.setTint(actionColor);
-        ImageView icon = new ImageView(this);
-        icon.setImageDrawable(drawable);
-        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        icon.setPadding(dp(6), dp(6), dp(6), dp(6));
-        item.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
-        TextView label = text(title + "\n" + subtitle, 13, true, textColor);
-        label.setPadding(dp(8), 0, 0, 0);
-        item.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
-        item.setOnClickListener(listener);
-        return item;
+    private Button listAction(int drawableRes, String title, View.OnClickListener listener) {
+        Button row = smallButton(title, listener);
+        Drawable icon = getDrawable(drawableRes).mutate();
+        icon.setBounds(0, 0, dp(22), dp(22));
+        icon.setTint(textColor);
+        row.setCompoundDrawablesRelative(icon, null, null, null);
+        row.setCompoundDrawablePadding(dp(13));
+        row.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        row.setTypeface(Typeface.DEFAULT_BOLD);
+        row.setTextSize(15);
+        row.setMinHeight(dp(49));
+        row.setPaddingRelative(dp(9), dp(8), dp(9), dp(8));
+        row.setBackground(new RippleDrawable(ColorStateList.valueOf(withAlpha(textColor, 20)), null,
+                rounded(Color.WHITE, 8, 0, Color.WHITE)));
+        return row;
     }
 
     private void renderScreen() {
@@ -1806,7 +1823,7 @@ public class MoneyMateActivity extends Activity {
         key.setText(prefs.getString("supabase_key", ""));
         form.addView(url);
         form.addView(key);
-        Button guide = iconSmallButton("Cómo crear y configurar Supabase", R.drawable.ic_action_help, null);
+        Button guide = iconSmallButton("Cómo crear y configurar Supabase", R.drawable.ic_sheet_book, null);
         form.addView(guide, new LinearLayout.LayoutParams(-1, dp(56)));
         form.addView(text("La clave debe ser la publica (publishable o anon). Nunca uses service_role.", 12, false, muted));
 
@@ -1885,9 +1902,9 @@ public class MoneyMateActivity extends Activity {
 
         Button accountAction = iconActionWide("Iniciar sesión", R.drawable.ic_menu_sync, null);
         form.addView(accountAction);
-        Button guide = iconSmallButton("Cómo crear y configurar Supabase", R.drawable.ic_action_help, null);
+        Button guide = iconSmallButton("Cómo crear y configurar Supabase", R.drawable.ic_sheet_book, null);
         form.addView(guide, new LinearLayout.LayoutParams(-1, dp(56)));
-        Button changeConnection = iconSmallButton("Cambiar conexión de Supabase", R.drawable.ic_menu_settings, null);
+        Button changeConnection = iconSmallButton("Cambiar conexión de Supabase", R.drawable.ic_sheet_sliders, null);
         form.addView(changeConnection, new LinearLayout.LayoutParams(-1, dp(52)));
 
         Runnable refreshMode = () -> {
@@ -1962,23 +1979,20 @@ public class MoneyMateActivity extends Activity {
     private void supabaseActionsDialog(String url, String key) {
         String email = prefs.getString("supabase_email", "");
         boolean conflict = prefs.getBoolean("supabase_conflict", false);
-        LinearLayout form = new LinearLayout(this);
-        form.setOrientation(LinearLayout.VERTICAL);
-        form.setPadding(dp(12), dp(8), dp(12), dp(4));
-        TextView status = text(
-                "Cuenta conectada\n" + email
-                        + "\nSincronización automática activa"
-                        + (conflict ? "\nConflicto pendiente: elige qué copia conservar" : "")
-                        + "\n" + lastSupabaseSyncLabel(),
-                13,
-                true,
-                conflict ? expenseColor : incomeColor
-        );
-        status.setBackground(rounded(surface2, 10, 0, strokeColor));
-        status.setPadding(dp(12), dp(10), dp(12), dp(10));
-        form.addView(status, margins(-1, -2, 0, 12));
+        LinearLayout form = actionList(16, 6);
+        LinearLayout status = actionList(9, 5);
+        String state = conflict ? "Conflicto de sincronización" : "Cuenta conectada";
+        TextView stateLabel = text(state, 15, true, textColor);
+        status.addView(stateLabel);
+        if (!email.isEmpty()) status.addView(text(email, 14, true, textColor));
+        TextView stateHint = text(conflict ? "Conflicto pendiente: elige qué copia conservar" : "Sincronización automática activa",
+                13, false, muted);
+        TextView updatedAt = text(lastSupabaseSyncLabel(), 13, false, muted);
+        status.addView(stateHint);
+        status.addView(updatedAt);
+        form.addView(status, margins(-1, -2, 0, 11));
         AlertDialog[] holder = new AlertDialog[1];
-        form.addView(iconActionWide(conflict ? "Conservar copia local y subir" : "Subir copia local ahora", R.drawable.ic_menu_sync, v -> {
+        Button upload = iconActionWide(conflict ? "Conservar copia local y subir" : "Subir copia local ahora", R.drawable.ic_sheet_cloud, v -> {
             holder[0].dismiss();
             if (!conflict) {
                 runSupabaseSync(true, false, url, key);
@@ -1992,34 +2006,29 @@ public class MoneyMateActivity extends Activity {
                     .create();
             confirm.show();
             styleDialog(confirm);
-        }));
-        form.addView(iconSmallButton(conflict ? "Usar copia de la nube" : "Descargar copia de la nube", R.drawable.ic_menu_import, v -> {
-            holder[0].dismiss();
-            confirmSupabaseDownload(url, key);
-        }), new LinearLayout.LayoutParams(-1, dp(48)));
-        form.addView(iconSmallButton("Manual y script SQL", R.drawable.ic_action_help, v -> {
-            holder[0].dismiss();
-            supabaseHelpDialog();
-        }), new LinearLayout.LayoutParams(-1, dp(52)));
-        form.addView(iconSmallButton("Cambiar conexión de Supabase", R.drawable.ic_menu_settings, v -> {
-            holder[0].dismiss();
-            supabaseConfigurationDialog();
-        }), new LinearLayout.LayoutParams(-1, dp(52)));
-        form.addView(iconSmallButton("Cerrar sesión en este dispositivo", R.drawable.ic_action_logout, v -> {
+        });
+        upload.setBackground(buttonPill(0xFF087653));
+        upload.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        upload.setPaddingRelative(dp(16), dp(6), dp(16), dp(6));
+        upload.setMinHeight(dp(50));
+        upload.setLayoutParams(margins(-1, -2, 0, 8));
+        form.addView(upload);
+        LinearLayout secondary = actionList(0, 0);
+        addListAction(secondary, R.drawable.ic_sheet_download, conflict ? "Usar copia de la nube" : "Descargar copia de la nube",
+                v -> closeThen(holder, () -> confirmSupabaseDownload(url, key)));
+        addListAction(secondary, R.drawable.ic_sheet_book, "Manual y script SQL", v -> closeThen(holder, this::supabaseHelpDialog));
+        addListAction(secondary, R.drawable.ic_sheet_sliders, "Cambiar conexión de Supabase", v -> closeThen(holder, this::supabaseConfigurationDialog));
+        addListAction(secondary, R.drawable.ic_sheet_logout, "Cerrar sesión en este dispositivo", v -> {
             holder[0].dismiss();
             clearSupabaseSession();
             toast("Sesión cerrada.");
             supabaseAccountDialog();
-        }), new LinearLayout.LayoutParams(-1, dp(52)));
-        ScrollView scroll = new ScrollView(this);
-        scroll.addView(form);
-        holder[0] = new AlertDialog.Builder(this)
-                .setTitle("Sincronización")
-                .setView(scroll)
-                .setPositiveButton("Cerrar", null)
-                .create();
-        holder[0].show();
-        styleDialog(holder[0]);
+        });
+        form.addView(secondary);
+        holder[0] = showActionDialog("Sincronización", form);
+        stateLabel.setTextColor(conflict ? expenseColor : incomeColor);
+        stateHint.setTextColor(muted);
+        updatedAt.setTextColor(muted);
     }
 
     private void confirmSupabaseDownload(String url, String key) {
@@ -3649,14 +3658,7 @@ public class MoneyMateActivity extends Activity {
     }
 
     private Button iconSmallButton(String label, int drawableRes, View.OnClickListener listener) {
-        Button button = smallButton(label, listener);
-        setButtonIcon(button, drawableRes, actionColor);
-        button.setSingleLine(false);
-        button.setMaxLines(2);
-        button.setTextSize(12);
-        button.setPadding(dp(10), dp(4), dp(10), dp(4));
-        button.setMinHeight(dp(48));
-        return button;
+        return listAction(drawableRes, label, listener);
     }
 
     private void setButtonIcon(Button button, int drawableRes, int color) {
@@ -3671,8 +3673,15 @@ public class MoneyMateActivity extends Activity {
     private void styleDialog(AlertDialog dialog) {
         Window window = dialog.getWindow();
         if (window != null) {
-            window.setBackgroundDrawable(rounded(surface, 12, 0, strokeColor));
+            window.setBackgroundDrawable(rounded(surface, 14, 1, strokeColor));
+            window.setDimAmount(0.34f);
             tintTextTree(window.getDecorView());
+            int titleId = getResources().getIdentifier("alertTitle", "id", "android");
+            View title = titleId != 0 ? window.findViewById(titleId) : null;
+            if (title instanceof TextView) {
+                ((TextView) title).setTypeface(Typeface.DEFAULT_BOLD);
+                ((TextView) title).setTextSize(20);
+            }
         }
         styleDialogButton(dialog.getButton(AlertDialog.BUTTON_POSITIVE));
         styleDialogButton(dialog.getButton(AlertDialog.BUTTON_NEGATIVE));
@@ -3684,6 +3693,7 @@ public class MoneyMateActivity extends Activity {
         button.setAllCaps(false);
         button.setTextColor(actionColor);
         button.setTextSize(14);
+        button.setTypeface(Typeface.DEFAULT_BOLD);
         button.setBackground(buttonPill(Color.TRANSPARENT));
         button.setMinHeight(0);
         button.setMinimumHeight(0);

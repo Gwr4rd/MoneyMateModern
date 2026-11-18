@@ -7,6 +7,7 @@ import {
   CloudDownload,
   CloudUpload,
   Copy,
+  Download,
   ExternalLink,
   FileSpreadsheet,
   Landmark,
@@ -16,7 +17,9 @@ import {
   LogOut,
   RotateCcw,
   Save,
+  SlidersHorizontal,
   Trash2,
+  Upload,
   UserPlus,
   X,
 } from "lucide-react";
@@ -474,23 +477,23 @@ export function SyncDialog({
               {conflict ? <AlertTriangle size={21} /> : <CheckCircle2 size={21} />}
               <span><strong>{t(conflict ? "Conflicto de sincronización" : "Cuenta conectada", language)}</strong><small>{user?.email}</small><small>{t(conflict ? "Elige qué copia deseas conservar" : "Sesion activa y sincronizacion automatica", language)}</small></span>
             </div>
-            <div className="dialog-actions">
-              <button disabled={busy} onClick={onDownload}>
+            <button className="dialog-primary sync-upload" disabled={busy} onClick={onUpload}>
+              <CloudUpload size={20} /> {t(conflict ? "Conservar copia local" : "Subir ahora", language)}
+            </button>
+            <div className="dialog-action-list">
+              <button className="action-row" disabled={busy} onClick={onDownload}>
                 <CloudDownload size={19} /> {t(conflict ? "Usar copia de la nube" : "Descargar", language)}
               </button>
-              <button className="dialog-primary" disabled={busy} onClick={onUpload}>
-                <CloudUpload size={19} /> {t(conflict ? "Conservar copia local" : "Subir ahora", language)}
+              <button className="action-row" onClick={() => setStage("help")}>
+                <BookOpen size={19} /> {t("Manual y script SQL", language)}
+              </button>
+              <button className="action-row" onClick={() => { setLocalMessage(""); setStage("config"); }}>
+                <SlidersHorizontal size={19} /> {t("Cambiar conexion de Supabase", language)}
+              </button>
+              <button className="action-row" disabled={busy} onClick={onSignOut}>
+                <LogOut size={19} /> {t("Cerrar sesion", language)}
               </button>
             </div>
-            <button className="sync-guide-button" onClick={() => setStage("help")}>
-              <BookOpen size={19} /> {t("Manual y script SQL", language)}
-            </button>
-            <button className="sync-change" onClick={() => { setLocalMessage(""); setStage("config"); }}>
-              {t("Cambiar conexion de Supabase", language)}
-            </button>
-            <button className="sync-signout" disabled={busy} onClick={onSignOut}>
-              <LogOut size={18} /> {t("Cerrar sesion", language)}
-            </button>
           </>
         ) : null}
         {localMessage || message ? <p className="dialog-message">{t(localMessage || message, language)}</p> : null}
@@ -521,10 +524,10 @@ export function BackupDialog({ data, canUndo, onClose, onExport, onApply, onUndo
   return (
     <Modal title={t("Datos y respaldos", language)} onClose={onClose} language={language}>
       <div className="backup-dialog">
-        <div className="backup-actions">
-          <button onClick={onExport}><CloudDownload size={20} /><span>{t("Exportar respaldo JSON", language)}</span></button>
-          <label><CloudUpload size={20} /><span>{t("Importar respaldo JSON", language)}</span><input type="file" accept="application/json,.json" onChange={readBackup} /></label>
-          {canUndo ? <button onClick={onUndo}><RotateCcw size={20} /><span>{t("Deshacer última importación", language)}</span></button> : null}
+        <div className="backup-actions dialog-action-list">
+          <label className="action-row"><Download size={20} /><span>{t("Importar respaldo JSON", language)}</span><input type="file" accept="application/json,.json" onChange={readBackup} /></label>
+          <button className="action-row" onClick={onExport}><Upload size={20} /><span>{t("Exportar respaldo JSON", language)}</span></button>
+          {canUndo ? <button className="action-row" onClick={onUndo}><RotateCcw size={20} /><span>{t("Deshacer última importación", language)}</span></button> : null}
         </div>
         {error ? <p className="dialog-message">{error}</p> : null}
         {preview ? (

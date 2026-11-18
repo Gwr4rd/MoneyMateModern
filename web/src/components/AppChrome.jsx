@@ -1,16 +1,19 @@
 import {
+  Archive,
   Banknote,
   BarChart3,
-  CloudMoon,
+  ChevronRight,
+  CloudUpload,
   DatabaseBackup,
   FileSpreadsheet,
+  Globe,
   ListTree,
-  Languages,
   Info,
   MoreVertical,
+  Moon,
   Plus,
-  RefreshCw,
   Search,
+  SlidersHorizontal,
   Sun,
   WalletCards,
 } from "lucide-react";
@@ -45,20 +48,20 @@ export function Header({ active, dark, language, onNav, onTheme, onCurrency, onS
           <span>{t("Nuevo movimiento", language)}</span>
         </button>
         <details className="mobile-overflow">
-          <summary aria-label={t("Abrir menu", language)}><MoreVertical size={25} /></summary>
+          <summary aria-label={t("Abrir menu", language)}><MoreVertical size={22} /></summary>
           <div>
             <details className="menu-group">
-              <summary><DatabaseBackup size={20} /> {t("Datos", language)}</summary>
+              <summary><Archive size={20} /> {t("Datos", language)} <ChevronRight className="menu-disclosure" size={14} /></summary>
               <button onClick={mobileAction(onReport)}><FileSpreadsheet size={18} /> {t("Generar reporte", language)}</button>
               <button onClick={mobileAction(onData)}><DatabaseBackup size={18} /> {t("Datos y respaldos", language)}</button>
             </details>
-            <button onClick={mobileAction(onSync)}><RefreshCw size={20} /> {t("Sincronizar", language)}</button>
-            <button onClick={mobileAction(onManage)}><ListTree size={20} /> {t("Organizar cuentas", language)}</button>
+            <button onClick={mobileAction(onSync)}><CloudUpload size={20} /> {t("Sincronizar", language)}</button>
+            <button onClick={mobileAction(onManage)}><WalletCards size={20} /> {t("Organizar cuentas", language)}</button>
             <details className="menu-group">
-              <summary><CloudMoon size={20} /> {t("Preferencias", language)}</summary>
-              <button onClick={mobileAction(onTheme)}>{dark ? <Sun size={18} /> : <CloudMoon size={18} />} {t(dark ? "Modo claro" : "Modo oscuro", language)}</button>
+              <summary><SlidersHorizontal size={20} /> {t("Preferencias", language)} <ChevronRight className="menu-disclosure" size={14} /></summary>
+              <button onClick={mobileAction(onLanguage)}><Globe size={18} /> {t("Idioma", language)}</button>
               <button onClick={mobileAction(onCurrency)}><Banknote size={18} /> {t("Moneda y pais", language)}</button>
-              <button onClick={mobileAction(onLanguage)}><Languages size={18} /> {t("Idioma", language)}</button>
+              <button onClick={mobileAction(onTheme)}>{dark ? <Sun size={18} /> : <Moon size={18} />} {t(dark ? "Modo claro" : "Modo oscuro", language)}</button>
             </details>
             <button onClick={mobileAction(onAbout)}><Info size={20} /> {t("Acerca de", language)}</button>
           </div>

@@ -953,22 +953,26 @@ select:focus-visible {
   max-height: calc(100vh - 36px);
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 14px;
   background: var(--surface);
+  box-shadow: 0 12px 36px rgb(0 0 0 / 16%);
 }
 
 .modal > header {
-  height: 58px;
+  min-height: 58px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 18px;
+  gap: 12px;
+  padding: 8px 18px;
   border-bottom: 1px solid var(--border);
 }
 
-.modal h2 {
+.modal > header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 750;
+  overflow-wrap: anywhere;
 }
 
 .modal header button {
@@ -979,6 +983,8 @@ select:focus-visible {
   padding: 0;
   border: 0;
   background: transparent;
+  color: var(--muted);
+  flex: 0 0 36px;
   cursor: pointer;
 }
 
@@ -1190,7 +1196,7 @@ select:focus-visible {
   gap: 10px;
 }
 
-.dialog-actions button,
+.dialog-actions button:not(.dialog-primary),
 .dialog-primary {
   min-height: 44px;
   display: inline-flex;
@@ -1198,9 +1204,9 @@ select:focus-visible {
   justify-content: center;
   gap: 7px;
   padding: 0 14px;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: 6px;
-  background: var(--surface-2);
+  background: transparent;
   cursor: pointer;
 }
 
@@ -1234,10 +1240,12 @@ select:focus-visible {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: var(--green-soft);
-  color: var(--green);
+  background: transparent;
+  color: var(--text);
 }
 
+.sync-status.connected > svg { flex: 0 0 auto; color: var(--green); }
+.sync-status.connected.conflict > svg { color: var(--red); }
 .sync-status.connected span {
   min-width: 0;
   display: grid;
@@ -1251,30 +1259,37 @@ select:focus-visible {
 }
 
 .sync-status.connected.conflict {
-  background: var(--red-soft);
-  color: var(--red);
+  background: transparent;
+  color: var(--text);
 }
 
-.backup-actions {
+.dialog-action-list {
   display: grid;
-  gap: 8px;
 }
 
-.backup-actions button,
-.backup-actions label {
+.dialog-action-list .action-row {
   min-height: 46px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--control);
+  gap: 13px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
+  text-align: start;
+  overflow-wrap: anywhere;
 }
+
+.dialog-action-list .action-row + .action-row { border-top: 1px solid var(--border); }
+.dialog-action-list .action-row :is(svg) { flex: 0 0 20px; stroke-width: 1.75; }
+.dialog-action-list .action-row:is(:hover, :focus-within) { background: var(--surface-2); }
+.dialog-action-list .action-row:disabled { opacity: 0.5; cursor: default; }
+.sync-upload.dialog-primary { justify-content: flex-start; gap: 13px; padding: 8px 18px; background: #087653; border-color: #087653; text-align: start; }
+.sync-upload.dialog-primary svg { flex: 0 0 auto; stroke-width: 1.75; }
 
 .backup-actions input {
   position: absolute;
@@ -1583,37 +1598,6 @@ select:focus-visible {
     display: grid;
     place-items: center;
     cursor: pointer;
-  }
-
-  .mobile-overflow[open] > div {
-    position: absolute;
-    top: 44px;
-    right: 0;
-    width: 220px;
-    display: grid;
-    z-index: 40;
-    padding: 6px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-  }
-
-  .mobile-overflow div button {
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 0 10px;
-    border: 0;
-    border-radius: 5px;
-    background: transparent;
-    color: var(--text);
-    cursor: pointer;
-    text-align: left;
-  }
-
-  .mobile-overflow div button:hover {
-    background: var(--surface-2);
   }
 
   .app-body {
@@ -2194,35 +2178,42 @@ select:focus-visible {
   top: 44px;
   right: 0;
   z-index: 40;
-  width: 245px;
+  width: min(232px, calc(100vw - 28px));
   max-height: min(70vh, 440px);
   overflow-y: auto;
   display: grid;
-  gap: 2px;
+  gap: 0;
   padding: 6px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: 0 12px 24px #00000020;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 14%);
 }
 
 .mobile-overflow[open] > div > button,
 .menu-group > summary,
 .menu-group > button {
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 0 10px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 6px;
   background: transparent;
   color: var(--text);
   cursor: pointer;
   text-align: left;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
+
+.mobile-overflow[open] > div svg { flex: 0 0 auto; stroke-width: 1.75; }
+.menu-disclosure { margin-inline-start: auto; color: var(--muted); }
+.menu-group[open] > summary .menu-disclosure { transform: rotate(90deg); }
 
 .menu-group > summary {
   list-style: none;
@@ -2251,7 +2242,6 @@ select:focus-visible {
   .account-main { grid-template-columns: 30px minmax(0, 1fr) auto; gap: 6px; }
   .account-actions { grid-column: 2; }
   .status-metrics strong { font-size: 12px; }
-  .mobile-overflow[open] > div { width: min(245px, 88vw); }
 }
 
 .app-body { grid-template-columns: 208px minmax(0, 1fr); }
@@ -2322,10 +2312,9 @@ select:focus-visible {
 .movement-segments .income { --segment-fill: var(--green-soft); --segment-text: var(--green); }
 .movement-segments .expense { --segment-fill: var(--red-soft); --segment-text: var(--red); }
 .movement-segments .transfer { --segment-fill: var(--blue-soft); --segment-text: var(--blue); }
-#root button:not(.transaction-main):not(.account-main),
+#root button:not(.transaction-main):not(.account-main):not(.action-row):not(.mobile-overflow button),
 #root .period-select,
 #root .dialog-primary,
-#root .backup-actions label,
 #root .filter-more > summary,
 #root .movement-more > summary { border-radius: 999px; }
 .filters { grid-template-columns: minmax(0, 1fr) 44px; }
