@@ -1,4 +1,5 @@
 import { Banknote, Eye, EyeOff, Landmark, ListTree, Pencil, Plus, Trash2, WalletCards } from "lucide-react";
+import { accountAccents } from "../lib/accountAccents";
 import { currency } from "../lib/finance";
 import { t } from "../i18n";
 
@@ -20,6 +21,7 @@ export function AccountsPanel({
   language,
 }) {
   const hiddenCount = accounts.filter(isHiddenAccount).length;
+  const accents = accountAccents(accounts.map((account) => account.name));
   const visibleCount = accounts.length - hiddenCount;
   const totalBalance = accounts.reduce((sum, account) => sum + (account.includeTotal !== false && !account.hidden ? Number(account.currentBalance) || 0 : 0), 0);
   const visible = accounts
@@ -63,15 +65,15 @@ export function AccountsPanel({
             return (
             <article className={`account-row ${hidden ? "hidden" : ""}`} key={account.name}>
               <button type="button" className="account-main" onClick={() => onSelect?.(account)} disabled={!onSelect}>
-                <span className="account-icon">
-                  {account.type === "Efectivo" ? <Banknote size={21} /> : <Landmark size={21} />}
+                <span className="account-icon" style={accents.get(account.name)} aria-hidden="true">
+                  {account.type === "Efectivo" ? <Banknote size={20} /> : <Landmark size={20} />}
                 </span>
                 <span className="account-copy">
                   <strong>{account.name}</strong>
                   <small>{automatic ? t("Saldo 0.00 · Oculta automáticamente", language) : account.hidden ? t("Oculta manualmente", language) : t(account.type, language)}</small>
                 </span>
-                <strong className={`account-balance ${account.currentBalance < 0 ? "negative" : ""}`}>
-                  {currency(account.currentBalance, currencyCode)}
+                <strong className={`account-balance ${!automatic && account.currentBalance < 0 ? "negative" : ""}`}>
+                  {currency(automatic ? 0 : account.currentBalance, currencyCode)}
                 </strong>
               </button>
               {full ? (

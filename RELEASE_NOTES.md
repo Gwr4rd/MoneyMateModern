@@ -1,22 +1,21 @@
-# Control Financiero 2.5.2
+# Control Financiero 2.5.3
 
-Un diseño más limpio y uniforme para el menú y las ventanas flotantes.
+Identifica las cuentas de un vistazo, sin confundir sus colores con los gastos.
 
 ## Novedades
 
-- Menú de tres puntos más compacto, con iconos de línea y rótulos en una sola fila.
-- Datos y respaldos, Preferencias y Sincronización comparten títulos en negrita, acciones alineadas a la izquierda y separadores discretos.
-- Idioma usa un icono de globo. La acción principal de subir la copia conserva su píldora verde oscuro.
-- La web adopta el mismo estilo en el menú y los diálogos.
+- Los iconos de cada cuenta reciben automáticamente un acento de color en Android y en la web, con variantes para modo claro y oscuro.
+- Los gastos y los saldos negativos conservan el rojo; los saldos positivos usan el color de texto habitual.
+- Las cuentas con saldo cero siguen ocultándose automáticamente.
 
 ## Compatibilidad
 
-- Mantiene el identificador y el certificado de firma de `2.5.1` para actualizar sobre la instalación existente.
+- Mantiene el identificador y el certificado de firma de `2.5.2` para actualizar sobre la instalación existente.
 - La sincronización usa la tabla existente de Supabase.
 
 ## Instalación
 
-Descarga `Control-Financiero-release-signed-v2.5.2.apk` e instálalo sobre la versión anterior.
+Descarga `Control-Financiero-release-signed-v2.5.3.apk` e instálalo sobre la versión anterior.
 
 ## Requisitos
 

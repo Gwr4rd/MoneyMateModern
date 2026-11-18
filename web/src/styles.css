@@ -887,11 +887,18 @@ select:focus-visible {
 }
 
 .account-icon {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
-  color: var(--green);
+  border-radius: 8px;
+  color: var(--account-accent-light);
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+:root[data-theme="dark"] .account-icon {
+  color: var(--account-accent-dark);
+  background: color-mix(in srgb, currentColor 18%, transparent);
 }
 
 .account-row div:nth-child(2) strong,

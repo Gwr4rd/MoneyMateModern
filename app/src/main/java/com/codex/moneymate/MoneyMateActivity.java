@@ -988,10 +988,13 @@ public class MoneyMateActivity extends Activity {
 
         List<MoneyDb.AccountTotal> visible = new ArrayList<>();
         List<MoneyDb.AccountTotal> hidden = new ArrayList<>();
+        List<String> names = new ArrayList<>();
         for (MoneyDb.AccountTotal a : accounts) {
+            names.add(a.name);
             if (isHiddenAccount(a)) hidden.add(a);
             else visible.add(a);
         }
+        Map<String, Integer> accountAccents = AccountAccents.assign(names, darkMode);
         sortAccounts(visible);
         sortAccounts(hidden);
 
@@ -1011,12 +1014,12 @@ public class MoneyMateActivity extends Activity {
             if (group.getValue().isEmpty()) continue;
             content.addView(accountGroupHeader(group.getKey(), groupTotal(group.getValue())));
             for (MoneyDb.AccountTotal a : group.getValue()) {
-                content.addView(accountRow(a));
+                content.addView(accountRow(a, accountAccents.get(a.name)));
             }
         }
         if (showHiddenAccounts && !hidden.isEmpty()) {
             content.addView(accountGroupHeader("Ocultas", 0));
-            for (MoneyDb.AccountTotal a : hidden) content.addView(accountRow(a));
+            for (MoneyDb.AccountTotal a : hidden) content.addView(accountRow(a, accountAccents.get(a.name)));
         }
         if (!hidden.isEmpty()) content.addView(hiddenAccountsToggle());
     }
@@ -3297,7 +3300,7 @@ public class MoneyMateActivity extends Activity {
         return "";
     }
 
-    private View accountRow(MoneyDb.AccountTotal a) {
+    private View accountRow(MoneyDb.AccountTotal a, int accountAccent) {
         boolean automatic = hasZeroBalance(a);
         boolean hidden = isHiddenAccount(a);
         LinearLayout row = new LinearLayout(this);
@@ -3307,14 +3310,32 @@ public class MoneyMateActivity extends Activity {
         row.setPadding(dp(12), dp(10), dp(12), dp(10));
         row.setLayoutParams(margins(-1, -2, 0, 6));
 
-        String status = automatic ? "Saldo 0.00 · Oculta automáticamente" : a.hidden ? "Oculta manualmente" : displayAccountType(a.type);
-        TextView name = text(a.name + "\n" + status, 13, false, hidden ? muted : textColor);
-        name.setGravity(Gravity.CENTER_VERTICAL);
-        row.addView(name, new LinearLayout.LayoutParams(0, dp(42), 1));
+        ImageView icon = new ImageView(this);
+        icon.setImageResource("Efectivo".equals(displayAccountType(a.type)) ? R.drawable.ic_sheet_banknote : R.drawable.ic_sheet_wallet);
+        icon.setColorFilter(accountAccent);
+        icon.setBackground(rounded(withAlpha(accountAccent, darkMode ? 46 : 26), 8, 0, Color.TRANSPARENT));
+        icon.setPadding(dp(6), dp(6), dp(6), dp(6));
+        icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(32), dp(32));
+        iconParams.setMarginEnd(dp(10));
+        row.addView(icon, iconParams);
 
-        TextView balance = text(money(Math.abs(a.balance)), 13, true, a.balance >= 0 ? incomeColor : expenseColor);
+        String status = automatic ? "Saldo 0.00 · Oculta automáticamente" : a.hidden ? "Oculta manualmente" : displayAccountType(a.type);
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        labels.setGravity(Gravity.CENTER_VERTICAL);
+        labels.setMinimumHeight(dp(38));
+        TextView name = text("", 14, true, hidden ? muted : textColor);
+        name.setText(a.name);
+        labels.addView(name);
+        labels.addView(text(status, 11, false, muted));
+        row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1.5f));
+
+        TextView balance = text(money(automatic ? 0 : a.balance), 13, true, automatic || a.balance >= 0 ? textColor : expenseColor);
         balance.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        row.addView(balance, new LinearLayout.LayoutParams(dp(132), dp(42)));
+        LinearLayout.LayoutParams balanceParams = new LinearLayout.LayoutParams(0, -2, 1);
+        balanceParams.setMarginStart(dp(8));
+        row.addView(balance, balanceParams);
         row.setOnClickListener(view -> {
             activeAccountId = a.id;
             accountMode = "diario";
