@@ -150,21 +150,23 @@ export function MovementDialog({ data, initial = null, mode = "new", onClose, on
       <form className="movement-form" onSubmit={submit}>
         <fieldset className="movement-kind-switch">
           <legend>{t("Tipo de movimiento", language)}</legend>
-          {[
-            ["income", "Ingreso"],
-            ["expense", "Gasto"],
-            ["transfer", "Transferencia"],
-          ].map(([kind, label]) => (
-            <button
-              className={`${kind} ${form.kind === kind ? "active" : ""}`}
-              type="button"
-              aria-pressed={form.kind === kind}
-              onClick={() => selectKind(kind)}
-              key={kind}
-            >
-              {t(label, language)}
-            </button>
-          ))}
+          <div className="movement-segments glass-control">
+            {[
+              ["income", "Ingreso"],
+              ["expense", "Gasto"],
+              ["transfer", "Transferencia"],
+            ].map(([kind, label]) => (
+              <button
+                className={`${kind} ${form.kind === kind ? "active" : ""}`}
+                type="button"
+                aria-pressed={form.kind === kind}
+                onClick={() => selectKind(kind)}
+                key={kind}
+              >
+                {t(label, language)}
+              </button>
+            ))}
+          </div>
         </fieldset>
         <label className="amount-field">{t("Importe", language)}<input name="amount" type="number" min="0.01" step="0.01" value={form.amount} onChange={change} inputMode="decimal" autoFocus /></label>
         <details className="movement-more" open={mode === "edit" || mode === "copy"}>
@@ -443,7 +445,7 @@ export function SyncDialog({
         {stage === "account" ? (
           <>
             <div className="sync-status ready">{t("Configuracion de Supabase guardada. Conecta tu cuenta para sincronizar.", language)}</div>
-            <div className="sync-account-tabs" role="tablist" aria-label={t("Acceso a Supabase", language)}>
+            <div className="sync-account-tabs glass-control" role="tablist" aria-label={t("Acceso a Supabase", language)}>
               <button className={accountMode === "login" ? "active" : ""} onClick={() => setAccountMode("login")}>{t("Iniciar sesion", language)}</button>
               <button className={accountMode === "create" ? "active" : ""} onClick={() => setAccountMode("create")}>{t("Crear cuenta", language)}</button>
             </div>

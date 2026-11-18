@@ -5,10 +5,13 @@ export const periods = [
   ["diario", "Diario"], ["semanal", "Semanal"], ["mensual", "Mensual"],
   ["semestral", "Semestral"], ["anual", "Anual"], ["todo", "Total"],
 ];
+const transactionPeriods = periods.filter(([scope]) => scope !== "semestral");
 
 export function TransactionPeriods({ value, onChange, language }) {
-  return <nav className="transaction-periods" aria-label={t("Periodo", language)}>
-    {periods.filter(([scope]) => scope !== "semestral").map(([scope, label]) => (
+  const selected = transactionPeriods.findIndex(([scope]) => scope === value);
+  return <nav className="transaction-periods glass-control" aria-label={t("Periodo", language)}
+    style={{ "--segment-index": Math.max(0, selected) }}>
+    {transactionPeriods.map(([scope, label]) => (
       <button type="button" key={scope} aria-pressed={value === scope} onClick={() => onChange(scope)}>{t(label, language)}</button>
     ))}
   </nav>;

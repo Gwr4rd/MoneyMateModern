@@ -1031,26 +1031,6 @@ select:focus-visible {
   font-size: 12px;
 }
 
-.movement-kind-switch button.active {
-  color: #ffffff;
-  font-weight: 700;
-}
-
-.movement-kind-switch button.income.active {
-  border-color: var(--green);
-  background: var(--green);
-}
-
-.movement-kind-switch button.expense.active {
-  border-color: var(--red);
-  background: var(--red);
-}
-
-.movement-kind-switch button.transfer.active {
-  border-color: var(--blue);
-  background: var(--blue);
-}
-
 .movement-form input,
 .movement-form select,
 .sync-form input,
@@ -1803,21 +1783,40 @@ select:focus-visible {
 
   .mobile-nav {
     position: fixed;
-    left: 10px;
-    right: 10px;
-    bottom: 8px;
+    left: 50%;
+    width: min(288px, calc(100% - 48px));
+    transform: translateX(-50%);
+    bottom: calc(10px + env(safe-area-inset-bottom));
     z-index: 30;
     height: 58px;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     padding: 4px;
-    border: 1px solid var(--border);
+    border: 1px solid color-mix(in srgb, var(--surface) 70%, var(--border));
     border-radius: 24px;
-    background: color-mix(in srgb, var(--surface) 94%, transparent);
-    backdrop-filter: blur(18px);
+    background: var(--surface);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 87%, transparent), color-mix(in srgb, var(--surface) 67%, transparent));
+    -webkit-backdrop-filter: blur(13px) saturate(140%);
+    backdrop-filter: blur(13px) saturate(140%);
+    box-shadow: 0 7px 22px rgb(0 0 0 / 13%), inset 0 1px 0 rgb(255 255 255 / 30%);
+    isolation: isolate;
+  }
+
+  .mobile-nav::before {
+    content: "";
+    position: absolute;
+    inset: 4px auto 4px 4px;
+    width: calc((100% - 8px) / 3);
+    transform: translateX(calc(var(--nav-index, 0) * 100%));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--green-soft) 86%, transparent);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 32%);
+    transition: transform 215ms cubic-bezier(.2, .75, .3, 1);
+    pointer-events: none;
   }
 
   .mobile-nav button {
+    position: relative;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -1829,11 +1828,10 @@ select:focus-visible {
     border-radius: 19px;
     background: transparent;
     color: var(--muted);
-    font-size: 9px;
+    font-size: 10px;
   }
 
   .mobile-nav button.active {
-    background: var(--green-soft);
     color: var(--green);
     font-weight: 700;
   }
@@ -2262,31 +2260,74 @@ select:focus-visible {
 .side-nav button { border-left: 0; }
 .app-header { background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(18px); }
 .page-heading { margin: 0 0 16px; font-size: 28px; line-height: 1.16; }
+.transaction-more { display: block; margin: 16px auto; min-height: 38px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); cursor: pointer; }
 .sync-indicator { margin-bottom: 8px; padding: 3px 0; border: 0; background: transparent; color: var(--muted); font-size: 12px; text-decoration: underline; cursor: pointer; }
 .transaction-periods {
-  display: flex;
-  width: fit-content;
-  max-width: 100%;
-  overflow-x: auto;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  width: min(100%, 424px);
   margin-bottom: 14px;
-  padding: 3px;
-  border-radius: 999px;
-  background: var(--surface-2);
 }
 .transaction-periods button {
-  flex: 1 0 auto;
+  position: relative;
+  min-width: 0;
   min-height: 36px;
-  padding: 4px 12px;
+  padding: 4px 2px;
   border: 0;
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
   font-size: 13px;
   font-weight: 650;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
-.transaction-periods button[aria-pressed="true"] { background: var(--surface); color: var(--text); }
+.transaction-periods button[aria-pressed="true"] { color: var(--text); }
+.glass-control {
+  --glass-fill: var(--surface-2);
+  --glass-edge: color-mix(in srgb, white 64%, transparent);
+  position: relative;
+  padding: 3px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--glass-fill) 97%, transparent), color-mix(in srgb, var(--glass-fill) 72%, transparent));
+  box-shadow: 0 2px 7px rgb(0 0 0 / 7%), inset 0 1px 0 var(--glass-edge);
+  -webkit-backdrop-filter: blur(7px) saturate(128%);
+  backdrop-filter: blur(7px) saturate(128%);
+}
+:root[data-theme="dark"] .glass-control { --glass-edge: rgb(255 255 255 / 14%); }
+.transaction-periods::before {
+  content: "";
+  position: absolute;
+  inset: 3px auto 3px 3px;
+  width: calc((100% - 6px) / 5);
+  border-radius: 999px;
+  transform: translateX(calc(var(--segment-index) * 100%));
+  background: linear-gradient(180deg, var(--surface), color-mix(in srgb, var(--surface) 73%, transparent));
+  box-shadow: inset 0 1px 0 var(--glass-edge), 0 2px 5px rgb(0 0 0 / 10%);
+  transition: transform 215ms cubic-bezier(.2, .75, .3, 1);
+  pointer-events: none;
+}
+.movement-kind-switch { display: block; }
+.movement-segments { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(104px, 1.25fr); }
+.movement-segments button { background: transparent; border: 1px solid transparent; overflow-wrap: anywhere; }
+.movement-segments button.active,
+.sync-account-tabs.glass-control button.active {
+  border-color: var(--glass-edge);
+  background: linear-gradient(180deg, var(--segment-fill, var(--surface)), color-mix(in srgb, var(--segment-fill, var(--surface)) 70%, transparent));
+  color: var(--segment-text, var(--text));
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 var(--glass-edge), 0 2px 4px rgb(0 0 0 / 8%);
+}
+.movement-segments .income { --segment-fill: var(--green-soft); --segment-text: var(--green); }
+.movement-segments .expense { --segment-fill: var(--red-soft); --segment-text: var(--red); }
+.movement-segments .transfer { --segment-fill: var(--blue-soft); --segment-text: var(--blue); }
+#root button:not(.transaction-main):not(.account-main),
+#root .period-select,
+#root .dialog-primary,
+#root .backup-actions label,
+#root .filter-more > summary,
+#root .movement-more > summary { border-radius: 999px; }
 .filters { grid-template-columns: minmax(0, 1fr) 44px; }
 .filters .search-field { grid-column: 1; }
 .filter-more { grid-column: 2; }
@@ -2323,8 +2364,9 @@ select:focus-visible {
 .account-flow-line.expense .flow-track i { background: var(--red); }
 @media (max-width: 760px) {
   .app-body { grid-template-columns: minmax(0, 1fr); }
+  .main-content { padding-bottom: calc(86px + env(safe-area-inset-bottom)); }
   .page-heading { font-size: 24px; }
-  .transaction-periods button { padding-inline: 8px; font-size: 12px; }
+  .transaction-periods button { font-size: 12px; }
   .transaction-periods { width: 100%; }
   .period-summary .summary-item strong { font-size: 14px; }
 }

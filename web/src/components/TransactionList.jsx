@@ -1,28 +1,53 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRightLeft, CircleDollarSign, Copy, MoreHorizontal, Pencil, ReceiptText, Trash2 } from "lucide-react";
-import { currency } from "../lib/finance";
 import { localeFor, t } from "../i18n";
 
-export function TransactionList({ transactions, currencyCode, onEdit, onCopy, onDelete, language }) {
+const PAGE_SIZE = 60;
+
+export function TransactionList({ transactions, currencyCode = "PEN", onEdit, onCopy, onDelete, language }) {
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const more = useRef(null);
+  const pageSize = Math.min(limit, transactions.length);
+  const hasMore = pageSize < transactions.length;
+  const groups = useMemo(() => {
+    const byDay = new Map();
+    for (const transaction of transactions.slice(0, pageSize)) {
+      if (!byDay.has(transaction.date)) byDay.set(transaction.date, []);
+      byDay.get(transaction.date).push(transaction);
+    }
+    return byDay;
+  }, [transactions, pageSize]);
+  const dateFormat = useMemo(() => new Intl.DateTimeFormat(localeFor(language), {
+    day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
+  }), [language]);
+  const moneyFormat = useMemo(() => new Intl.NumberFormat("es-PE", {
+    style: "currency", currency: currencyCode, minimumFractionDigits: 2,
+  }), [currencyCode]);
+
+  useEffect(() => {
+    if (!hasMore || !more.current || typeof IntersectionObserver === "undefined") return undefined;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry?.isIntersecting) return;
+      observer.disconnect();
+      setLimit((previous) => previous + PAGE_SIZE);
+    }, { rootMargin: "0px 0px 400px" });
+    observer.observe(more.current);
+    return () => observer.disconnect();
+  }, [hasMore, pageSize]);
+
   if (transactions.length === 0) {
     return <div className="empty-state">{t("No se encontraron transacciones.", language)}</div>;
   }
-  const groups = Object.groupBy
-    ? Object.groupBy(transactions, (transaction) => transaction.date)
-    : transactions.reduce((map, transaction) => {
-        (map[transaction.date] ||= []).push(transaction);
-        return map;
-      }, {});
 
   return (
     <div className="transaction-groups">
-      {Object.entries(groups).map(([date, rows]) => (
+      {[...groups].map(([date, rows]) => (
         <section className="transaction-day" key={date}>
-          <h2>{formatDate(date, language)}</h2>
+          <h2>{dateFormat.format(new Date(`${date}T12:00:00Z`))}</h2>
           {rows.map((transaction) => (
             <TransactionRow
               transaction={transaction}
-              currencyCode={currencyCode}
+              formattedAmount={moneyFormat.format(transaction.amount)}
               onEdit={onEdit}
               onCopy={onCopy}
               onDelete={onDelete}
@@ -32,11 +57,13 @@ export function TransactionList({ transactions, currencyCode, onEdit, onCopy, on
           ))}
         </section>
       ))}
+      {hasMore ? <button type="button" className="transaction-more" ref={more}
+        onClick={() => setLimit((previous) => previous + PAGE_SIZE)}>{t("Cargar más movimientos", language)}</button> : null}
     </div>
   );
 }
 
-function TransactionRow({ transaction, currencyCode, onEdit, onCopy, onDelete, language }) {
+function TransactionRow({ transaction, formattedAmount, onEdit, onCopy, onDelete, language }) {
   const [expanded, setExpanded] = useState(false);
   const transfer = transaction.kind === "transfer";
   const income = transaction.kind === "income";
@@ -54,7 +81,7 @@ function TransactionRow({ transaction, currencyCode, onEdit, onCopy, onDelete, l
           <strong className="transaction-note-primary">{title}</strong>
           <span className="transaction-meta">{movementLabel} · {accountMeta} · {transaction.time}</span>
         </span>
-        <strong className="transaction-amount">{currency(transaction.amount, currencyCode)}</strong>
+        <strong className="transaction-amount">{formattedAmount}</strong>
       </button>
       <details className="transaction-actions">
         <summary title={t("Acciones", language)} aria-label={t("Acciones", language)}><MoreHorizontal size={20} /></summary>
@@ -67,13 +94,4 @@ function TransactionRow({ transaction, currencyCode, onEdit, onCopy, onDelete, l
       {expanded ? <div className="transaction-detail"><span>{transaction.date} · {transaction.time}</span><span>{accountMeta}</span>{transaction.description ? <span>{transaction.description}</span> : null}</div> : null}
     </article>
   );
-}
-
-function formatDate(value, language) {
-  return new Intl.DateTimeFormat(localeFor(language), {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${value}T12:00:00Z`));
 }

@@ -9,12 +9,13 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.InsetDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -34,12 +35,15 @@ import android.view.animation.DecelerateInterpolator;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
+import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.PopupWindow;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -67,6 +71,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class MoneyMateActivity extends Activity {
     private static final int IMPORT_BACKUP = 4001;
@@ -77,6 +84,18 @@ public class MoneyMateActivity extends Activity {
 
     private MoneyDb db;
     private LinearLayout content;
+    private ScrollView pageScroll;
+    private LinearLayout pageContent;
+    private ListView timeline;
+    private LinearLayout timelineHeader;
+    private TimelineAdapter timelineAdapter;
+    private TextView headerTitle;
+    private LinearLayout navigation;
+    private View navIndicator;
+    private int selectedNavTab = -1;
+    private final ExecutorService timelineLoader = Executors.newSingleThreadExecutor();
+    private Future<?> timelineLoad;
+    private long timelineRequest;
     private String screen = "trans";
     private String transactionMode = "diario";
     private String accountMode = "diario";
@@ -163,6 +182,12 @@ public class MoneyMateActivity extends Activity {
     }
 
     @Override
+    protected void onDestroy() {
+        timelineLoader.shutdownNow();
+        super.onDestroy();
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
@@ -180,26 +205,33 @@ public class MoneyMateActivity extends Activity {
 
         root.addView(topBar());
 
-        ScrollView scroll = new ScrollView(this);
-        content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        scroll.addView(content);
-        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        FrameLayout viewport = new FrameLayout(this);
+        pageContent = new LinearLayout(this);
+        pageContent.setOrientation(LinearLayout.VERTICAL);
+        pageScroll = new ScrollView(this);
+        pageScroll.setClipToPadding(false);
+        pageScroll.setPadding(0, 0, 0, dp(74));
+        pageScroll.addView(pageContent);
+        viewport.addView(pageScroll, new FrameLayout.LayoutParams(-1, -1));
 
-        LinearLayout navShell = new LinearLayout(this);
-        navShell.setOrientation(LinearLayout.VERTICAL);
-        navShell.setPadding(dp(5), dp(3), dp(5), dp(3));
-        navShell.setBackground(rounded(surface, 26, 0, strokeColor));
-        navShell.setElevation(0);
-        navShell.setLayoutParams(margins(-1, -2, 2, 0));
-        LinearLayout nav = new LinearLayout(this);
-        nav.setGravity(Gravity.CENTER);
-        nav.setOrientation(LinearLayout.HORIZONTAL);
-        nav.addView(tab("Transacciones", "trans", R.drawable.ic_nav_register), new LinearLayout.LayoutParams(0, dp(56), 1));
-        nav.addView(tab("Estado", "stats", R.drawable.ic_nav_status), new LinearLayout.LayoutParams(0, dp(56), 1));
-        nav.addView(tab("Cuentas", "accounts", R.drawable.ic_nav_accounts), new LinearLayout.LayoutParams(0, dp(56), 1));
-        navShell.addView(nav);
-        root.addView(navShell);
+        timeline = new ListView(this);
+        timeline.setDivider(null);
+        timeline.setDividerHeight(0);
+        timeline.setClipToPadding(false);
+        timeline.setPadding(0, 0, 0, dp(74));
+        timelineHeader = new LinearLayout(this);
+        timelineHeader.setOrientation(LinearLayout.VERTICAL);
+        timeline.addHeaderView(timelineHeader, null, false);
+        timelineAdapter = new TimelineAdapter();
+        timeline.setAdapter(timelineAdapter);
+        viewport.addView(timeline, new FrameLayout.LayoutParams(-1, -1));
+
+        int availableWidth = Math.max(1, getResources().getDisplayMetrics().widthPixels - dp(48));
+        FrameLayout.LayoutParams floating = new FrameLayout.LayoutParams(Math.min(dp(288), availableWidth), dp(58),
+                Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM);
+        floating.bottomMargin = dp(7);
+        viewport.addView(floatingNavigation(), floating);
+        root.addView(viewport, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
         renderScreen();
     }
@@ -219,21 +251,22 @@ public class MoneyMateActivity extends Activity {
         logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         top.addView(logo, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
-        String subtitle;
-        if ("stats".equals(screen)) subtitle = titleForScreen() + " · " + statsRange().label;
-        else if ("trans".equals(screen)) subtitle = titleForScreen() + " · " + transactionRangeLabel();
-        else subtitle = titleForScreen() + " · " + monthLabel(period);
-        TextView title = text("", 18, true, textColor);
-        title.setText(appHeaderText("Control Financiero", ui(subtitle)));
-        title.setGravity(Gravity.CENTER);
-        title.setOnClickListener(v -> {
+        headerTitle = text("", 18, true, textColor);
+        headerTitle.setGravity(Gravity.CENTER);
+        headerTitle.setOnClickListener(v -> {
             if ("stats".equals(screen)) statsDateDialog();
             else if ("trans".equals(screen)) transactionDateDialog();
             else monthDialog();
         });
-        top.addView(title, new LinearLayout.LayoutParams(0, dp(50), 1));
+        top.addView(headerTitle, new LinearLayout.LayoutParams(0, dp(50), 1));
         top.addView(topIcon("⋮", v -> menuDialog(v)), new LinearLayout.LayoutParams(dp(44), dp(48)));
         return top;
+    }
+
+    private void updateHeaderTitle() {
+        String range = "stats".equals(screen) ? statsRange().label
+                : "trans".equals(screen) ? transactionRangeLabel() : monthLabel(period);
+        headerTitle.setText(appHeaderText("Control Financiero", titleForScreen() + " · " + range));
     }
 
     private String titleForScreen() {
@@ -472,30 +505,31 @@ public class MoneyMateActivity extends Activity {
     }
 
     private void renderScreen() {
+        if (isDestroyed()) return;
+        if (timelineLoad != null) timelineLoad.cancel(true);
+        timelineRequest++;
+        boolean showTimeline = "trans".equals(screen);
+        pageScroll.setVisibility(showTimeline ? View.GONE : View.VISIBLE);
+        timeline.setVisibility(showTimeline ? View.VISIBLE : View.GONE);
+        content = showTimeline ? timelineHeader : pageContent;
         content.removeAllViews();
+        updateHeaderTitle();
+        updateNavigation();
         if ("stats".equals(screen)) renderStats();
         else if ("accounts".equals(screen)) renderAccounts();
         else renderTransactions();
-        animateContent();
     }
 
     private void renderTransactions() {
         boolean searching = "buscar".equals(transactionMode);
         boolean daily = "diario".equals(transactionMode);
         boolean total = "todo".equals(transactionMode);
-        TransactionRange range = TransactionScopes.range(transactionMode, transactionAnchorDate, db.latestDate(), language);
+        TransactionRange range = TransactionScopes.range(transactionMode, transactionAnchorDate, today(), language);
         String start = searching || daily ? null : range.start;
         String end = searching || daily ? null : range.end;
-        List<MoneyDb.Row> rows = db.transactionsForDisplay(start, end);
-        if (searching) {
-            rows = filterTransactions(rows);
-            if (!searchFrom.isEmpty()) rows.removeIf(row -> row.date.compareTo(searchFrom) < 0);
-            if (!searchTo.isEmpty()) rows.removeIf(row -> row.date.compareTo(searchTo) > 0);
-        }
 
         LinearLayout periods = new LinearLayout(this);
-        periods.setPadding(dp(3), dp(3), dp(3), dp(3));
-        periods.setBackground(rounded(surface2, 24, 0, surface2));
+        styleGlassTrack(periods);
         String[] scopes = {"diario", "semanal", "mensual", "anual", "todo"};
         for (String scope : scopes) {
             periods.addView(modeButton(scopeLabel(scope), scope), new LinearLayout.LayoutParams(0, dp(42), 1));
@@ -514,6 +548,32 @@ public class MoneyMateActivity extends Activity {
             TextView dateFilter = section(total ? ui("Total") : range.label);
             if (!total) dateFilter.setOnClickListener(v -> transactionDateDialog());
             content.addView(dateFilter);
+        }
+        timelineAdapter.submit(Collections.emptyList());
+        timeline.setSelection(0);
+        long request = timelineRequest;
+        String query = searchQuery;
+        String account = searchAccount;
+        String from = searchFrom;
+        String to = searchTo;
+        timelineLoad = timelineLoader.submit(() -> {
+            try {
+                List<MoneyDb.Row> rows = db.transactionsForDisplay(start, end);
+                List<MoneyDb.Row> results = searching ? filterTransactions(rows, query, account, from, to) : rows;
+                runOnUiThread(() -> {
+                    if (request == timelineRequest && !isDestroyed()) showTransactionResults(results, searching, daily, total);
+                });
+            } catch (RuntimeException error) {
+                android.util.Log.w("MoneyMate", "Could not load transaction history", error);
+                runOnUiThread(() -> {
+                    if (request == timelineRequest && !isDestroyed()) content.addView(empty("No se pudieron cargar los movimientos."));
+                });
+            }
+        });
+    }
+
+    private void showTransactionResults(List<MoneyDb.Row> rows, boolean searching, boolean daily, boolean total) {
+        if (!daily && !searching) {
             double income = 0, expense = 0, transfer = 0;
             for (MoneyDb.Row row : rows) {
                 if (row.isTransfer()) transfer += row.amount;
@@ -528,22 +588,26 @@ public class MoneyMateActivity extends Activity {
             content.addView(summary);
         }
         if (searching) content.addView(activeSearchStrip(rows.size()));
-        if (!total) renderTransactionRows(rows, false);
+        if (!total) {
+            if (rows.isEmpty()) content.addView(empty("No hay movimientos para mostrar."));
+            else timelineAdapter.submit(rows);
+        }
     }
 
     private String transactionRangeLabel() {
         if ("buscar".equals(transactionMode)) return ui("Busqueda");
         if ("diario".equals(transactionMode) || "todo".equals(transactionMode)) return ui(scopeLabel(transactionMode));
-        return TransactionScopes.range(transactionMode, transactionAnchorDate, db.latestDate(), language).label;
+        return TransactionScopes.range(transactionMode, transactionAnchorDate, today(), language).label;
     }
-    private List<MoneyDb.Row> filterTransactions(List<MoneyDb.Row> rows) {
+    private List<MoneyDb.Row> filterTransactions(List<MoneyDb.Row> rows, String search, String account, String from, String to) {
         List<MoneyDb.Row> out = new ArrayList<>();
-        String query = searchQuery.trim().toLowerCase(Locale.US);
+        String query = search.trim().toLowerCase(Locale.US);
         for (MoneyDb.Row row : rows) {
-            if (!searchAccount.isEmpty()) {
+            if ((!from.isEmpty() && row.date.compareTo(from) < 0) || (!to.isEmpty() && row.date.compareTo(to) > 0)) continue;
+            if (!account.isEmpty()) {
                 boolean accountMatch = row.isTransfer()
-                        ? searchAccount.equals(row.transferFrom) || searchAccount.equals(row.transferTo)
-                        : searchAccount.equals(row.account);
+                        ? account.equals(row.transferFrom) || account.equals(row.transferTo)
+                        : account.equals(row.account);
                 if (!accountMatch) continue;
             }
             if (!query.isEmpty()) {
@@ -801,7 +865,7 @@ public class MoneyMateActivity extends Activity {
         Button export = smallButton("Exportar estado XLSX", v -> prepareStatusReport());
         export.setTextSize(12);
         export.setTextColor(actionColor);
-        export.setBackground(rounded(controlSurface(), 8, 0, strokeColor));
+        export.setBackground(glassPill(controlSurface()));
         setButtonIcon(export, R.drawable.ic_menu_report, actionColor);
         row.addView(export, new LinearLayout.LayoutParams(dp(190), dp(40)));
         return row;
@@ -833,7 +897,7 @@ public class MoneyMateActivity extends Activity {
         LinearLayout control = new LinearLayout(this);
         control.setOrientation(LinearLayout.HORIZONTAL);
         control.setGravity(Gravity.CENTER);
-        control.setBackground(rounded(actionSoft, 8, 0, strokeColor));
+        control.setBackground(glassPill(actionSoft));
         control.setPadding(dp(8), 0, dp(8), 0);
         Drawable drawable = getResources().getDrawable(R.drawable.ic_action_filter).mutate();
         drawable.setTint(actionColor);
@@ -976,10 +1040,11 @@ public class MoneyMateActivity extends Activity {
 
         LinearLayout modes = new LinearLayout(this);
         modes.setOrientation(LinearLayout.HORIZONTAL);
-        modes.addView(accountModeButton("Diario", "diario"), pillParams(false));
-        modes.addView(accountModeButton("Mensual", "mensual"), pillParams(false));
-        modes.addView(accountModeButton("Anual", "anual"), pillParams(true));
-        content.addView(modes);
+        styleGlassTrack(modes);
+        modes.addView(accountModeButton("Diario", "diario"), new LinearLayout.LayoutParams(0, dp(42), 1));
+        modes.addView(accountModeButton("Mensual", "mensual"), new LinearLayout.LayoutParams(0, dp(42), 1));
+        modes.addView(accountModeButton("Anual", "anual"), new LinearLayout.LayoutParams(0, dp(42), 1));
+        content.addView(modes, margins(-1, -2, 0, 8));
 
         String start = "anual".equals(accountMode) ? period.substring(0, 4) + "-01-01" : period + "-01";
         String end = "anual".equals(accountMode) ? period.substring(0, 4) + "-12-31" : period + "-31";
@@ -1066,7 +1131,7 @@ public class MoneyMateActivity extends Activity {
         row.addView(topActionButton("Nueva cuenta", v -> accountDialog()), new LinearLayout.LayoutParams(0, dp(44), 1));
         Button organize = topActionButton("Organizar", v -> accountMetadataDialog());
         organize.setTextColor(textColor);
-        organize.setBackground(rounded(controlSurface(), 8, 0, strokeColor));
+        organize.setBackground(glassPill(controlSurface()));
         LinearLayout.LayoutParams organizeParams = new LinearLayout.LayoutParams(0, dp(44), 1);
         organizeParams.setMargins(dp(8), 0, 0, 0);
         row.addView(organize, organizeParams);
@@ -1088,7 +1153,7 @@ public class MoneyMateActivity extends Activity {
         row.setLayoutParams(margins(-1, dp(46), 0, 8));
         TextView button = text("+  " + ui(label), 13, true, Color.WHITE);
         button.setGravity(Gravity.CENTER);
-        button.setBackground(rounded(actionColor, 8, 0, actionColor));
+        button.setBackground(buttonPill(actionColor));
         button.setPadding(dp(14), 0, dp(14), 0);
         button.setOnClickListener(listener);
         row.addView(button, new LinearLayout.LayoutParams(dp(212), dp(44)));
@@ -1100,7 +1165,7 @@ public class MoneyMateActivity extends Activity {
         b.setTextSize(13);
         b.setTypeface(Typeface.DEFAULT_BOLD);
         b.setTextColor(Color.WHITE);
-        b.setBackground(rounded(actionColor, 8, 0, actionColor));
+        b.setBackground(buttonPill(actionColor));
         return b;
     }
 
@@ -1108,17 +1173,6 @@ public class MoneyMateActivity extends Activity {
         showHiddenAccounts = !showHiddenAccounts;
         prefs.edit().putBoolean("show_hidden_accounts", showHiddenAccounts).apply();
         renderScreen();
-    }
-
-    private void animateContent() {
-        content.setAlpha(0f);
-        content.setTranslationY(dp(8));
-        content.animate()
-                .alpha(1f)
-                .translationY(0)
-                .setDuration(180)
-                .setInterpolator(new DecelerateInterpolator())
-                .start();
     }
 
     private LinearLayout accountGroupHeader(String title, double total) {
@@ -1152,8 +1206,7 @@ public class MoneyMateActivity extends Activity {
             accountMode = target;
             renderScreen();
         });
-        b.setTextColor(accountMode.equals(target) ? Color.WHITE : muted);
-        b.setBackground(rounded(accountMode.equals(target) ? actionColor : surface, 14, 0, strokeColor));
+        styleGlassSegment(b, accountMode.equals(target), surface, actionColor);
         return b;
     }
 
@@ -1242,14 +1295,15 @@ public class MoneyMateActivity extends Activity {
         form.addView(label("Tipo de movimiento"));
         LinearLayout typeSwitch = new LinearLayout(this);
         typeSwitch.setOrientation(LinearLayout.HORIZONTAL);
+        styleGlassTrack(typeSwitch);
         Button incomeType = smallButton("Ingreso", null);
         Button expenseType = smallButton("Gasto", null);
         Button transferType = smallButton("Transferencia", null);
         Button[] typeButtons = {expenseType, incomeType, transferType};
-        typeSwitch.addView(incomeType, movementTypeParams(false));
-        typeSwitch.addView(expenseType, movementTypeParams(false));
-        typeSwitch.addView(transferType, movementTypeParams(true));
-        form.addView(typeSwitch);
+        typeSwitch.addView(incomeType, new LinearLayout.LayoutParams(0, dp(44), 1));
+        typeSwitch.addView(expenseType, new LinearLayout.LayoutParams(0, dp(44), 1));
+        typeSwitch.addView(transferType, new LinearLayout.LayoutParams(0, dp(44), 1));
+        form.addView(typeSwitch, margins(-1, -2, 0, 10));
         type.setVisibility(View.GONE);
         form.addView(type, new LinearLayout.LayoutParams(1, 1));
 
@@ -1257,7 +1311,7 @@ public class MoneyMateActivity extends Activity {
         form.addView(amount);
         TextView dateTimeToggle = text("", 13, true, actionColor);
         dateTimeToggle.setPadding(dp(12), dp(10), dp(12), dp(10));
-        dateTimeToggle.setBackground(rounded(controlSurface(), 8, 0, strokeColor));
+        dateTimeToggle.setBackground(glassPill(controlSurface()));
         form.addView(dateTimeToggle, margins(-1, -2, 0, 8));
         LinearLayout dateTime = new LinearLayout(this);
         dateTime.setOrientation(LinearLayout.HORIZONTAL);
@@ -1814,13 +1868,12 @@ public class MoneyMateActivity extends Activity {
 
         boolean[] createMode = {false};
         LinearLayout tabs = new LinearLayout(this);
+        styleGlassTrack(tabs);
         Button loginTab = smallButton("Iniciar sesión", null);
         Button createTab = smallButton("Crear cuenta", null);
         tabs.addView(loginTab, new LinearLayout.LayoutParams(0, dp(42), 1));
-        LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(0, dp(42), 1);
-        createParams.setMargins(dp(6), 0, 0, 0);
-        tabs.addView(createTab, createParams);
-        form.addView(tabs, margins(-1, dp(42), 0, 10));
+        tabs.addView(createTab, new LinearLayout.LayoutParams(0, dp(42), 1));
+        form.addView(tabs, margins(-1, -2, 0, 10));
 
         EditText email = input("Correo");
         email.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
@@ -1838,10 +1891,8 @@ public class MoneyMateActivity extends Activity {
         form.addView(changeConnection, new LinearLayout.LayoutParams(-1, dp(52)));
 
         Runnable refreshMode = () -> {
-            loginTab.setTextColor(createMode[0] ? muted : Color.WHITE);
-            createTab.setTextColor(createMode[0] ? Color.WHITE : muted);
-            loginTab.setBackground(rounded(createMode[0] ? surface2 : actionColor, 12, 0, strokeColor));
-            createTab.setBackground(rounded(createMode[0] ? actionColor : surface2, 12, 0, strokeColor));
+            styleGlassSegment(loginTab, !createMode[0], surface, actionColor);
+            styleGlassSegment(createTab, createMode[0], surface, actionColor);
             accountAction.setText(ui(createMode[0] ? "Crear cuenta" : "Iniciar sesión"));
         };
         loginTab.setOnClickListener(v -> {
@@ -3100,47 +3151,129 @@ public class MoneyMateActivity extends Activity {
         startActivity(Intent.createChooser(send, "Compartir"));
     }
 
-    private View transactionRow(MoneyDb.Row r) {
-        boolean transfer = r.isTransfer();
-        boolean income = "income".equals(r.kind);
-        int amountColor = transfer ? transferColor : (income ? incomeColor : expenseColor);
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setBackground(rounded(surface, 8, 1, amountColor));
-        row.setPadding(dp(10), dp(11), dp(12), dp(11));
-        row.setLayoutParams(margins(-1, -2, 0, 7));
+    private View transactionRow(MoneyDb.Row row) {
+        TransactionRowView view = new TransactionRowView();
+        view.bind(row);
+        return view;
+    }
 
-        Drawable movementIcon = getResources().getDrawable(transfer ? R.drawable.ic_menu_sync : R.drawable.ic_nav_register).mutate();
-        movementIcon.setTint(amountColor);
-        ImageView icon = new ImageView(this);
-        icon.setImageDrawable(movementIcon);
-        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        icon.setPadding(dp(8), dp(8), dp(8), dp(8));
-        icon.setBackground(rounded(transfer ? transferSoft : (income ? softIncome() : softExpense()), 18, 0, strokeColor));
-        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(38), dp(38));
-        iconParams.setMargins(0, 0, dp(10), 0);
-        row.addView(icon, iconParams);
+    private final class TransactionRowView extends FrameLayout {
+        private final ImageView icon;
+        private final TextView details;
+        private final TextView amount;
+        private final GradientDrawable rowBackground = rounded(surface, 8, 0, strokeColor);
+        private final GradientDrawable iconBackground = rounded(surface2, 18, 0, strokeColor);
+        private final GradientDrawable amountBackground = rounded(surface2, 8, 0, strokeColor);
+        private boolean transferIcon;
+        private MoneyDb.Row movement;
 
-        TextView left = text("", 13, false, textColor);
-        String movementName = transfer ? "Transferencia" : (income ? "Ingreso" : "Gasto");
-        String primary = r.note.trim().isEmpty() ? movementName : r.note.trim();
-        String secondary = transfer
-                ? movementName + " · " + r.time + " · " + (r.transferFrom.isEmpty() ? r.account : r.transferFrom) + " → " + (r.transferTo.isEmpty() ? "Cuenta destino" : r.transferTo)
-                : movementName + " · " + r.time + " · " + r.account;
-        SpannableString meta = highlightedMeta(primary, secondary, r.description);
-        if (transfer) meta.setSpan(new ForegroundColorSpan(transferColor), 0, primary.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-        left.setText(meta);
-        left.setGravity(Gravity.CENTER_VERTICAL);
-        row.addView(left, new LinearLayout.LayoutParams(0, -2, 1));
+        TransactionRowView() {
+            super(MoneyMateActivity.this);
+            setPadding(0, 0, 0, dp(7));
+            LinearLayout row = new LinearLayout(MoneyMateActivity.this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setBackground(rowBackground);
+            row.setPadding(dp(10), dp(11), dp(12), dp(11));
+            addView(row, new FrameLayout.LayoutParams(-1, -2));
 
-        TextView amount = text(money(r.amount), 13, true, amountColor);
-        amount.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        amount.setBackground(rounded(transfer ? Color.TRANSPARENT : (income ? softIncome() : softExpense()), 8, 0, strokeColor));
-        amount.setPadding(dp(8), dp(5), dp(8), dp(5));
-        row.addView(amount, new LinearLayout.LayoutParams(dp(124), -2));
-        row.setOnClickListener(view -> transactionDetail(r));
-        return row;
+            icon = new ImageView(MoneyMateActivity.this);
+            icon.setImageResource(R.drawable.ic_nav_register);
+            icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            icon.setPadding(dp(8), dp(8), dp(8), dp(8));
+            icon.setBackground(iconBackground);
+            LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(38), dp(38));
+            iconParams.rightMargin = dp(10);
+            row.addView(icon, iconParams);
+
+            details = text("", 13, false, textColor);
+            details.setGravity(Gravity.CENTER_VERTICAL);
+            row.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
+            amount = text("", 13, true, textColor);
+            amount.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+            amount.setBackground(amountBackground);
+            amount.setPadding(dp(8), dp(5), dp(8), dp(5));
+            row.addView(amount, new LinearLayout.LayoutParams(dp(124), -2));
+            setOnClickListener(view -> transactionDetail(movement));
+        }
+
+        void bind(MoneyDb.Row row) {
+            movement = row;
+            boolean transfer = row.isTransfer();
+            boolean income = "income".equals(row.kind);
+            int color = transfer ? transferColor : (income ? incomeColor : expenseColor);
+            int softColor = income ? softIncome() : softExpense();
+            rowBackground.setStroke(dp(1), color);
+            iconBackground.setColor(transfer ? transferSoft : softColor);
+            amountBackground.setColor(transfer ? Color.TRANSPARENT : softColor);
+            if (transfer != transferIcon) {
+                icon.setImageResource(transfer ? R.drawable.ic_menu_sync : R.drawable.ic_nav_register);
+                transferIcon = transfer;
+            }
+            icon.setColorFilter(color);
+
+            String kind = ui(transfer ? "Transferencia" : (income ? "Ingreso" : "Gasto"));
+            String primary = row.note.trim().isEmpty() ? kind : row.note.trim();
+            String account = transfer
+                    ? (row.transferFrom.isEmpty() ? row.account : row.transferFrom) + " → " + (row.transferTo.isEmpty() ? ui("Cuenta destino") : row.transferTo)
+                    : row.account;
+            SpannableString meta = highlightedMeta(primary, kind + " · " + row.time + " · " + account, row.description);
+            if (transfer) meta.setSpan(new ForegroundColorSpan(transferColor), 0, primary.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+            details.setText(meta);
+            amount.setText(money(row.amount));
+            amount.setTextColor(color);
+        }
+    }
+
+    private static final class TimelineEntry {
+        final String date;
+        final MoneyDb.Row movement;
+
+        TimelineEntry(String date, MoneyDb.Row movement) {
+            this.date = date;
+            this.movement = movement;
+        }
+    }
+
+    private final class TimelineAdapter extends BaseAdapter {
+        private final List<TimelineEntry> entries = new ArrayList<>();
+
+        void submit(List<MoneyDb.Row> rows) {
+            entries.clear();
+            String previous = "";
+            for (MoneyDb.Row row : rows) {
+                if (!row.date.equals(previous)) {
+                    entries.add(new TimelineEntry(row.date, null));
+                    previous = row.date;
+                }
+                entries.add(new TimelineEntry(row.date, row));
+            }
+            notifyDataSetChanged();
+        }
+
+        @Override public int getCount() { return entries.size(); }
+        @Override public TimelineEntry getItem(int position) { return entries.get(position); }
+        @Override public boolean areAllItemsEnabled() { return false; }
+        @Override public boolean isEnabled(int position) { return getItem(position).movement != null; }
+        @Override public int getViewTypeCount() { return 2; }
+        @Override public int getItemViewType(int position) { return getItem(position).movement == null ? 0 : 1; }
+        @Override public long getItemId(int position) {
+            MoneyDb.Row row = getItem(position).movement;
+            return row != null ? row.id : -1L - position;
+        }
+
+        @Override
+        public View getView(int position, View recycled, ViewGroup parent) {
+            TimelineEntry entry = getItem(position);
+            if (entry.movement == null) {
+                TextView day = recycled instanceof TextView ? (TextView) recycled : section(entry.date);
+                day.setText(entry.date);
+                return day;
+            }
+            TransactionRowView row = recycled instanceof TransactionRowView
+                    ? (TransactionRowView) recycled : new TransactionRowView();
+            row.bind(entry.movement);
+            return row;
+        }
     }
 
     private String noteSuffix(MoneyDb.Row r) {
@@ -3239,15 +3372,14 @@ public class MoneyMateActivity extends Activity {
 
     private Button modeButton(String label, String target) {
         Button b = smallButton(label, v -> {
+            if (transactionMode.equals(target)) return;
             transactionMode = target;
-            draw();
+            renderScreen();
         });
-        b.setTextColor(transactionMode.equals(target) ? actionColor : muted);
         b.setTextSize(11);
         b.setMinWidth(0);
         b.setPadding(dp(2), 0, dp(2), 0);
-        b.setSelected(transactionMode.equals(target));
-        b.setBackground(rounded(transactionMode.equals(target) ? surface : surface2, 22, 0, surface2));
+        styleGlassSegment(b, transactionMode.equals(target), surface, actionColor);
         return b;
     }
 
@@ -3261,7 +3393,7 @@ public class MoneyMateActivity extends Activity {
         button.setCompoundDrawablePadding(dp(3));
         button.setTextColor(selected ? actionColor : muted);
         button.setTextSize(11);
-        button.setBackground(rounded(selected ? actionSoft : surface2, 8, 0, strokeColor));
+        button.setBackground(glassPill(selected ? actionSoft : surface2));
         return button;
     }
 
@@ -3327,48 +3459,139 @@ public class MoneyMateActivity extends Activity {
         styleDialog(dialog);
     }
 
-    private LinearLayout.LayoutParams pillParams(boolean last) {
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(34), 1);
-        p.setMargins(0, 0, last ? 0 : dp(6), dp(8));
-        return p;
+    private FrameLayout floatingNavigation() {
+        FrameLayout shell = new FrameLayout(this);
+        shell.setClickable(true);
+        shell.setPadding(dp(4), dp(4), dp(4), dp(4));
+        shell.setBackground(glassShape(surface, 29));
+        shell.setElevation(dp(9));
+
+        navIndicator = new View(this);
+        navIndicator.setBackground(glassShape(actionSoft, 24));
+        FrameLayout.LayoutParams mark = new FrameLayout.LayoutParams(0, -1);
+        mark.topMargin = dp(1);
+        mark.bottomMargin = dp(1);
+        shell.addView(navIndicator, mark);
+
+        navigation = new LinearLayout(this);
+        navigation.addView(tab("Transacciones", "trans", R.drawable.ic_nav_register), new LinearLayout.LayoutParams(0, -1, 1));
+        navigation.addView(tab("Estado", "stats", R.drawable.ic_nav_status), new LinearLayout.LayoutParams(0, -1, 1));
+        navigation.addView(tab("Cuentas", "accounts", R.drawable.ic_nav_accounts), new LinearLayout.LayoutParams(0, -1, 1));
+        navigation.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            if (right - left != oldRight - oldLeft) positionNavIndicator(false);
+        });
+        shell.addView(navigation, new FrameLayout.LayoutParams(-1, -1));
+        selectedNavTab = -1;
+        return shell;
     }
 
     private View tab(String label, String target, int iconRes) {
         LinearLayout tab = new LinearLayout(this);
         tab.setOrientation(LinearLayout.VERTICAL);
         tab.setGravity(Gravity.CENTER);
-        tab.setClickable(true);
         tab.setFocusable(true);
-        tab.setPadding(0, dp(2), 0, dp(1));
         tab.setOnClickListener(v -> screenTo(target));
-        boolean selected = screen.equals(target);
-        if (selected) {
-            tab.setBackground(new InsetDrawable(rounded(actionSoft, 26, 0, strokeColor), dp(3), dp(2), dp(3), dp(2)));
-        } else {
-            tab.setBackgroundColor(Color.TRANSPARENT);
-        }
 
-        Drawable icon = getResources().getDrawable(iconRes).mutate();
-        icon.setTint(selected ? actionColor : muted);
-        ImageView image = new ImageView(this);
-        image.setImageDrawable(icon);
-        image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        tab.addView(image, new LinearLayout.LayoutParams(dp(25), dp(25)));
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        tab.addView(icon, new LinearLayout.LayoutParams(dp(23), dp(23)));
 
-        TextView text = text(label, 10, selected, selected ? actionColor : muted);
-        text.setGravity(Gravity.CENTER);
-        text.setIncludeFontPadding(false);
-        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(-2, dp(15));
-        textParams.setMargins(0, 0, 0, 0);
-        tab.addView(text, textParams);
+        TextView name = text(label, 10, false, muted);
+        name.setGravity(Gravity.CENTER);
+        name.setIncludeFontPadding(false);
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, -2);
+        labelParams.topMargin = dp(2);
+        tab.addView(name, labelParams);
         return tab;
     }
 
+    private void updateNavigation() {
+        int selected = "stats".equals(screen) ? 1 : "accounts".equals(screen) ? 2 : 0;
+        if (selected == selectedNavTab) return;
+        boolean animate = selectedNavTab >= 0;
+        selectedNavTab = selected;
+        for (int i = 0; i < navigation.getChildCount(); i++) {
+            LinearLayout tab = (LinearLayout) navigation.getChildAt(i);
+            boolean active = i == selected;
+            int color = active ? actionColor : muted;
+            tab.setSelected(active);
+            ((ImageView) tab.getChildAt(0)).setColorFilter(color);
+            TextView label = (TextView) tab.getChildAt(1);
+            label.setTextColor(color);
+            label.setTypeface(active ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        }
+        positionNavIndicator(animate);
+    }
+
+    private void positionNavIndicator(boolean animate) {
+        View target = navigation.getChildAt(selectedNavTab);
+        if (target == null || target.getWidth() == 0) return;
+        int inset = dp(2);
+        ViewGroup.LayoutParams params = navIndicator.getLayoutParams();
+        int width = target.getWidth() - inset * 2;
+        if (params.width != width) {
+            params.width = width;
+            navIndicator.setLayoutParams(params);
+        }
+        float x = target.getLeft() + inset;
+        navIndicator.animate().cancel();
+        if (animate && android.animation.ValueAnimator.areAnimatorsEnabled()) {
+            navIndicator.animate().translationX(x).setDuration(215)
+                    .setInterpolator(new DecelerateInterpolator()).start();
+        } else navIndicator.setTranslationX(x);
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return (color & 0x00FFFFFF) | (alpha << 24);
+    }
+
+    private GradientDrawable glassShape(int color, int radius) {
+        int shine = darkMode ? 0x2EFFFFFF : 0xEBFFFFFF;
+        GradientDrawable glass = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{
+                withAlpha(color, 246), withAlpha(color, 221), withAlpha(color, darkMode ? 193 : 199)
+        });
+        glass.setCornerRadius(dp(radius));
+        glass.setStroke(dp(1), shine);
+        return glass;
+    }
+
+    private Drawable glassPill(int color) {
+        return pillRipple(glassShape(color, 100));
+    }
+
+    private Drawable buttonPill(int color) {
+        return pillRipple(rounded(color, 100, 0, strokeColor));
+    }
+
+    private Drawable pillRipple(Drawable background) {
+        return new RippleDrawable(ColorStateList.valueOf(withAlpha(textColor, 34)), background,
+                rounded(Color.WHITE, 100, 0, Color.WHITE));
+    }
+
+    private void styleGlassTrack(LinearLayout track) {
+        track.setPadding(dp(3), dp(3), dp(3), dp(3));
+        track.setBackground(glassShape(surface2, 26));
+    }
+
+    private void styleGlassSegment(Button button, boolean selected, int fill, int highlight) {
+        button.setSelected(selected);
+        button.setTextColor(selected ? highlight : muted);
+        button.setTypeface(Typeface.DEFAULT, selected ? Typeface.BOLD : Typeface.NORMAL);
+        button.setBackground(selected ? glassPill(fill) : buttonPill(Color.TRANSPARENT));
+    }
+
     private void screenTo(String target) {
+        if (screen.equals(target)) {
+            if ("trans".equals(target)) timeline.setSelection(0);
+            else pageScroll.scrollTo(0, 0);
+            return;
+        }
         screen = target;
         if (!"accounts".equals(target)) activeAccountId = -1;
         if (!"stats".equals(target)) statsDetailAccount = null;
-        draw();
+        pageScroll.scrollTo(0, 0);
+        renderScreen();
     }
 
     private Button smallButton(String label, View.OnClickListener listener) {
@@ -3377,7 +3600,7 @@ public class MoneyMateActivity extends Activity {
         b.setAllCaps(false);
         b.setTextSize(12);
         b.setTextColor(textColor);
-        b.setBackground(rounded(actionSoft, 8, 0, strokeColor));
+        b.setBackground(buttonPill(actionSoft));
         b.setOnClickListener(listener);
         b.setMinHeight(0);
         b.setMinimumHeight(0);
@@ -3394,7 +3617,7 @@ public class MoneyMateActivity extends Activity {
         Button b = smallButton(label, listener);
         b.setTextSize("⋮".equals(label) ? 30 : 20);
         b.setTextColor(textColor);
-        b.setBackground(rounded(Color.TRANSPARENT, 20, 0, strokeColor));
+        b.setBackground(buttonPill(Color.TRANSPARENT));
         return b;
     }
 
@@ -3402,7 +3625,7 @@ public class MoneyMateActivity extends Activity {
         ImageButton button = new ImageButton(this);
         button.setImageResource(drawableRes);
         button.setColorFilter(textColor);
-        button.setBackgroundColor(Color.TRANSPARENT);
+        button.setBackground(buttonPill(Color.TRANSPARENT));
         button.setPadding(dp(8), dp(8), dp(8), dp(8));
         button.setScaleType(ImageView.ScaleType.CENTER);
         button.setOnClickListener(listener);
@@ -3414,7 +3637,7 @@ public class MoneyMateActivity extends Activity {
         b.setTextSize(15);
         b.setTypeface(Typeface.DEFAULT_BOLD);
         b.setTextColor(Color.WHITE);
-        b.setBackground(rounded(actionColor, 8, 0, actionColor));
+        b.setBackground(buttonPill(actionColor));
         b.setLayoutParams(margins(-1, dp(52), 0, 8));
         return b;
     }
@@ -3461,6 +3684,7 @@ public class MoneyMateActivity extends Activity {
         button.setAllCaps(false);
         button.setTextColor(actionColor);
         button.setTextSize(14);
+        button.setBackground(buttonPill(Color.TRANSPARENT));
         button.setMinHeight(0);
         button.setMinimumHeight(0);
     }
@@ -3566,19 +3790,11 @@ public class MoneyMateActivity extends Activity {
         return input;
     }
 
-    private LinearLayout.LayoutParams movementTypeParams(boolean last) {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(44), 1);
-        params.setMargins(0, 0, last ? 0 : dp(6), dp(10));
-        return params;
-    }
-
     private void styleMovementTypeButtons(Button[] buttons, int selected) {
         for (int i = 0; i < buttons.length; i++) {
-            boolean active = i == selected;
             int color = i == 0 ? expenseColor : (i == 1 ? incomeColor : transferColor);
-            buttons[i].setTextColor(active ? Color.WHITE : muted);
-            buttons[i].setTypeface(Typeface.DEFAULT, active ? Typeface.BOLD : Typeface.NORMAL);
-            buttons[i].setBackground(rounded(active ? color : controlSurface(), 8, 1, active ? color : strokeColor));
+            int tint = i == 0 ? softExpense() : (i == 1 ? softIncome() : transferSoft);
+            styleGlassSegment(buttons[i], i == selected, tint, color);
         }
     }
 

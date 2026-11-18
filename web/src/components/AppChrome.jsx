@@ -83,9 +83,10 @@ export function SideNav({ active, onChange, language }) {
 
 export function MobileNav({ active, onChange, language }) {
   return (
-    <nav className="mobile-nav" aria-label={t("Navegacion principal", language)}>
+    <nav className="mobile-nav" aria-label={t("Navegacion principal", language)}
+      style={{ "--nav-index": Math.max(0, navItems.findIndex(({ id }) => id === active)) }}>
       {navItems.map(({ id, label, icon: Icon }) => (
-        <button className={active === id ? "active" : ""} onClick={() => onChange(id)} key={id}>
+        <button className={active === id ? "active" : ""} aria-current={active === id ? "page" : undefined} onClick={() => onChange(id)} key={id}>
           <Icon size={24} />
           <span>{t(label, language)}</span>
         </button>

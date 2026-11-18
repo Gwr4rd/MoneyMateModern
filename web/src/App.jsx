@@ -179,7 +179,7 @@ export default function App() {
 
   function navigate(next) {
     setActive(next);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo(0, 0);
   }
 
   function openSearch() {
@@ -511,6 +511,7 @@ export default function App() {
                 <Summary value={summaryValue} currencyCode={data.currency} language={language} />
               </div> : null}
               {scope !== "todo" ? <TransactionList
+                key={JSON.stringify([scope, filters.account, filters.query, scope === "diario" ? "" : filters.anchor])}
                 transactions={visibleTransactions}
                 currencyCode={data.currency}
                 onEdit={(transaction) => setDialog({ type: "movement", mode: "edit", item: transaction })}

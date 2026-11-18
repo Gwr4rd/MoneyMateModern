@@ -10,6 +10,8 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -271,13 +273,14 @@ public final class MoneyDb extends SQLiteOpenHelper {
     private List<Row> collapseTransfers(List<Row> rows) {
         List<Row> out = new ArrayList<>();
         Set<Long> used = new HashSet<>();
+        TransferCandidates candidates = new TransferCandidates(rows);
         for (Row row : rows) {
             if (used.contains(row.id)) continue;
             if (!row.isTransferPart()) {
                 out.add(row);
                 continue;
             }
-            Row pair = findTransferPair(row, rows, used);
+            Row pair = findTransferPair(row, candidates.forRow(row), used);
             if (pair == null) {
                 out.add(row.asUnpairedTransfer());
                 used.add(row.id);
@@ -292,7 +295,32 @@ public final class MoneyDb extends SQLiteOpenHelper {
         return out;
     }
 
+    private static final class TransferCandidates {
+        private final Map<String, List<Row>> references = new HashMap<>();
+        private final Map<List<String>, List<Row>> legacy = new HashMap<>();
+
+        TransferCandidates(List<Row> rows) {
+            for (Row row : rows) {
+                if (!row.isTransferPart()) continue;
+                if (row.transferRef.isEmpty()) {
+                    legacy.computeIfAbsent(legacyKey(row), key -> new ArrayList<>(2)).add(row);
+                } else {
+                    references.computeIfAbsent(row.transferRef, key -> new ArrayList<>(2)).add(row);
+                }
+            }
+        }
+
+        List<Row> forRow(Row row) {
+            return row.transferRef.isEmpty() ? legacy.get(legacyKey(row)) : references.get(row.transferRef);
+        }
+
+        private static List<String> legacyKey(Row row) {
+            return Arrays.asList(row.date, row.time, row.note, row.description);
+        }
+    }
+
     private Row findTransferPair(Row row, List<Row> rows, Set<Long> used) {
+        if (rows == null) return null;
         Row best = null;
         long bestDistance = Long.MAX_VALUE;
         for (Row candidate : rows) {
@@ -754,15 +782,16 @@ public final class MoneyDb extends SQLiteOpenHelper {
 
     private void backfillTransferRefs(SQLiteDatabase db) {
         List<Row> rows = new ArrayList<>();
-        try (Cursor c = db.rawQuery("SELECT id,date,COALESCE(time,'00:00'),account,category,kind,amount,COALESCE(note,''),COALESCE(description,''),COALESCE(transfer_ref,'') FROM transactions WHERE category='Transferencia' ORDER BY id", null)) {
+        try (Cursor c = db.rawQuery("SELECT id,date,COALESCE(time,'00:00'),account,category,kind,amount,COALESCE(note,''),COALESCE(description,''),COALESCE(transfer_ref,'') FROM transactions WHERE category='Transferencia' AND COALESCE(transfer_ref,'')='' ORDER BY id", null)) {
             while (c.moveToNext()) {
                 rows.add(new Row(c.getLong(0), c.getString(1), c.getString(2), c.getString(3), c.getString(4), c.getString(5), c.getDouble(6), c.getString(7), c.getString(8), c.getString(9)));
             }
         }
         Set<Long> used = new HashSet<>();
+        TransferCandidates candidates = new TransferCandidates(rows);
         for (Row row : rows) {
             if (used.contains(row.id) || !"expense".equals(row.kind)) continue;
-            Row pair = findTransferPair(row, rows, used);
+            Row pair = findTransferPair(row, candidates.forRow(row), used);
             if (pair == null) continue;
             String ref = UUID.randomUUID().toString();
             db.execSQL("UPDATE transactions SET transfer_ref=? WHERE id IN (?,?)", new Object[]{ref, row.id, pair.id});
