@@ -27,7 +27,7 @@ data class IntegrityReport(
     val unpairedTransfers: Int,
 ) {
     val repairableIssues: Int
-        get() = duplicateMovements + orphanMovements
+        get() = orphanMovements
 
     val healthy: Boolean
         get() = databaseOk && duplicateMovements == 0 && orphanMovements == 0 && invalidMovements == 0 && unpairedTransfers == 0

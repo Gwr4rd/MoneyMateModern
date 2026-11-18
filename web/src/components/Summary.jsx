@@ -5,7 +5,7 @@ export function Summary({ value, currencyCode, language }) {
   const items = [
     { label: "Ingresos", value: value.income, className: "income" },
     { label: "Gastos", value: value.expense, className: "expense" },
-    { label: "Balance", value: value.balance, className: "balance" },
+    { label: "Transferencias", value: value.transfer, className: "transfer" },
   ];
   return (
     <section className="summary-band" aria-label={t("Resumen", language)}>

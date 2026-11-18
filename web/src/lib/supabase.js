@@ -99,14 +99,22 @@ async function requireSession() {
   return { client, user };
 }
 
-export async function uploadSnapshot(snapshot) {
+export class SnapshotConflict extends Error {}
+
+export async function uploadSnapshot(snapshot, expectedVersion) {
   const { client, user } = await requireSession();
-  const { data, error } = await client
-    .from("money_snapshots")
-    .upsert({ user_id: user.id, data: snapshot }, { onConflict: "user_id" })
+  const table = client.from("money_snapshots");
+  const row = { user_id: user.id, data: snapshot };
+  const mutation = expectedVersion === undefined
+    ? table.upsert(row, { onConflict: "user_id" })
+    : expectedVersion
+      ? table.update({ data: snapshot }).eq("user_id", user.id).eq("updated_at", expectedVersion)
+      : table.upsert(row, { onConflict: "user_id", ignoreDuplicates: true });
+  const { data, error } = await mutation
     .select("updated_at")
-    .single();
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new SnapshotConflict();
   return data;
 }
 

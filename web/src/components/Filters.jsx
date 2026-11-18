@@ -3,8 +3,16 @@ import { t } from "../i18n";
 
 export const periods = [
   ["diario", "Diario"], ["semanal", "Semanal"], ["mensual", "Mensual"],
-  ["semestral", "Semestral"], ["anual", "Anual"], ["todo", "Todo"],
+  ["semestral", "Semestral"], ["anual", "Anual"], ["todo", "Total"],
 ];
+
+export function TransactionPeriods({ value, onChange, language }) {
+  return <nav className="transaction-periods" aria-label={t("Periodo", language)}>
+    {periods.filter(([scope]) => scope !== "semestral").map(([scope, label]) => (
+      <button type="button" key={scope} aria-pressed={value === scope} onClick={() => onChange(scope)}>{t(label, language)}</button>
+    ))}
+  </nav>;
+}
 
 export function PeriodSelect({ value, onChange, language }) {
   return <select className="period-select" aria-label={t("Periodo", language)} value={value} onChange={(event) => onChange(event.target.value)}>
@@ -12,7 +20,7 @@ export function PeriodSelect({ value, onChange, language }) {
   </select>;
 }
 
-export function Filters({ filters, accounts, scope, onScope, onChange, onClear, language }) {
+export function Filters({ filters, accounts, scope, onChange, onClear, language }) {
   return (
     <section className="filters" aria-label={t("Buscar y filtrar", language)}>
       <label className="search-field">
@@ -28,7 +36,6 @@ export function Filters({ filters, accounts, scope, onScope, onChange, onClear, 
           </button>
         ) : null}
       </label>
-      <PeriodSelect value={scope} onChange={onScope} language={language} />
       <details className="filter-more">
         <summary title={t("Buscar y filtrar", language)} aria-label={t("Buscar y filtrar", language)}><SlidersHorizontal size={20} /></summary>
         <div className="filter-extra">
@@ -39,10 +46,10 @@ export function Filters({ filters, accounts, scope, onScope, onChange, onClear, 
               {accounts.map((account) => <option key={account.name}>{account.name}</option>)}
             </select>
           </label>
-          <label className="date-field">
+          {scope !== "diario" && scope !== "todo" ? <label className="date-field">
             <CalendarDays size={19} />
             <input type="date" value={filters.anchor} onChange={(event) => onChange({ ...filters, anchor: event.target.value })} />
-          </label>
+          </label> : null}
           <button className="filter-reset" onClick={onClear} title={t("Limpiar filtros", language)} aria-label={t("Limpiar filtros", language)}>
             <X size={19} /> {t("Limpiar filtros", language)}
           </button>

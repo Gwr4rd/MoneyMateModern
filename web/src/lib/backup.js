@@ -29,29 +29,32 @@ export function normalizeSnapshot(snapshot) {
     categoryMap.set(`${kind}|${normalizeText(name)}`, { ...category, name, kind });
   }
 
-  const seenTransactions = new Set();
+  const seenTransactions = new Map();
   let duplicatesRemoved = 0;
   const transactions = [];
-  for (const transaction of Array.isArray(source.transactions) ? source.transactions : []) {
+  for (const transaction of snapshotRows(source)) {
     const normalized = {
       id: transaction.id || crypto.randomUUID(),
       date: validDate(transaction.date) ? transaction.date : today(),
       time: /^\d{2}:\d{2}$/.test(transaction.time || "") ? transaction.time : "00:00",
       kind: ["income", "expense", "transfer"].includes(transaction.kind) ? transaction.kind : "expense",
-      account: clean(transaction.account, "Cuenta"),
-      toAccount: transaction.kind === "transfer" ? clean(transaction.toAccount, "") : "",
+      account: canonicalAccount(transaction.account, "Cuenta"),
+      toAccount: transaction.kind === "transfer" ? canonicalAccount(transaction.toAccount, "") : "",
       category: transaction.kind === "transfer" ? "Transferencia" : clean(transaction.category, "Sin categoria"),
       amount: Math.abs(Number(transaction.amount) || 0),
       note: transaction.note || "",
       description: transaction.description || "",
     };
-    if (!normalized.amount || (normalized.kind === "transfer" && (!normalized.toAccount || normalized.toAccount === normalized.account))) continue;
+    if (!Number.isFinite(normalized.amount) || !normalized.amount || (normalized.kind === "transfer" && (!normalized.toAccount || normalizeText(normalized.toAccount) === normalizeText(normalized.account)))) continue;
     const fingerprint = transactionFingerprint(normalized);
-    if (seenTransactions.has(fingerprint)) {
-      duplicatesRemoved += 1;
-      continue;
+    if (seenTransactions.has(normalized.id)) {
+      if (seenTransactions.get(normalized.id) === fingerprint) {
+        duplicatesRemoved += 1;
+        continue;
+      }
+      normalized.id = crypto.randomUUID();
     }
-    seenTransactions.add(fingerprint);
+    seenTransactions.set(normalized.id, fingerprint);
     transactions.push(normalized);
     ensureAccount(accountMap, normalized.account, currency);
     if (normalized.toAccount) ensureAccount(accountMap, normalized.toAccount, currency);
@@ -79,9 +82,15 @@ export function normalizeSnapshot(snapshot) {
     },
     duplicatesRemoved,
   };
+
+  function canonicalAccount(value, fallback) {
+    const name = clean(value, fallback);
+    return accountMap.get(normalizeText(name))?.name || name;
+  }
 }
 
 export function prepareBackupImport(raw, currentData, fileName) {
+  validateSnapshot(raw);
   const normalized = normalizeSnapshot(raw);
   const rows = normalized.data.transactions;
   const current = new Set((currentData?.transactions || []).map(transactionFingerprint));
@@ -106,6 +115,39 @@ export function prepareBackupImport(raw, currentData, fileName) {
     expense: rows.filter((transaction) => transaction.kind === "expense").reduce((sum, row) => sum + row.amount, 0),
     warnings,
   };
+}
+
+export function validateSnapshot(raw) {
+  const rows = Array.isArray(raw) ? raw : raw?.transactions;
+  const validVersion = raw && (raw.version === 1 || raw.version === 2);
+  if (!Array.isArray(rows) || (rows.length === 0 && (!validVersion || !Array.isArray(raw.accounts)))
+      || rows.some((row) => !row || !validDate(row.date) || !["income", "expense", "transfer"].includes(row.kind)
+        || !clean(row.account, "") || !Number.isFinite(Number(row.amount)) || Number(row.amount) === 0
+        || (row.kind === "transfer" && (!clean(row.toAccount, "") || normalizeText(row.account) === normalizeText(row.toAccount))))) {
+    throw new Error("El archivo JSON no es un respaldo válido.");
+  }
+}
+
+function snapshotRows(source) {
+  const rows = Array.isArray(source.transactions) ? source.transactions : [];
+  if (source.version !== 1) return rows;
+
+  // Android v1 exported a matched debit and credit instead of a transfer row.
+  const consumed = new Set();
+  const restored = [];
+  for (const [index, row] of rows.entries()) {
+    if (row.kind !== "expense" || row.category !== "Transferencia") continue;
+    const pair = rows.findIndex((other, candidate) => !consumed.has(candidate)
+      && other.kind === "income" && other.category === "Transferencia"
+      && normalizeText(other.account) !== normalizeText(row.account)
+      && other.date === row.date && other.time === row.time && Number(other.amount) === Number(row.amount)
+      && (other.note || "") === (row.note || "") && (other.description || "") === (row.description || ""));
+    if (pair === -1) continue;
+    consumed.add(index);
+    consumed.add(pair);
+    restored.push({ ...row, kind: "transfer", toAccount: rows[pair].account });
+  }
+  return [...restored, ...rows.filter((_, index) => !consumed.has(index))];
 }
 
 export function transactionFingerprint(transaction) {
@@ -145,7 +187,9 @@ function normalizeText(value) {
 }
 
 function validDate(value) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value || "") && !Number.isNaN(Date.parse(`${value}T00:00:00`));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
 function sortTransactions(left, right) {

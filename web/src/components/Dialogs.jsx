@@ -58,15 +58,17 @@ const automaticCategory = (kind) => kind === "income" ? "Ingreso" : kind === "ex
 
 export function MovementDialog({ data, initial = null, mode = "new", onClose, onSave, language }) {
   const availableAccounts = useMemo(() => accountBalances(data)
+    .filter((account) => !account.hidden || (mode === "edit" && (initial?.account === account.name || initial?.toAccount === account.name)))
     .map((account, index) => ({
       ...account,
       active: !account.hidden && Math.abs(Number(account.currentBalance) || 0) >= 0.005,
       originalIndex: index,
     }))
-    .sort((left, right) => Number(right.active) - Number(left.active) || left.originalIndex - right.originalIndex), [data]);
+    .sort((left, right) => Number(right.active) - Number(left.active) || left.originalIndex - right.originalIndex), [data, initial, mode]);
   const lastAccount = window.localStorage.getItem("moneymate-last-account");
-  const defaultAccount = initial?.account || availableAccounts.find((account) => account.name === lastAccount)?.name || availableAccounts[0]?.name || "";
-  const defaultToAccount = initial?.toAccount
+  const defaultAccount = availableAccounts.find(({ name }) => name === initial?.account)?.name
+    || availableAccounts.find(({ name }) => name === lastAccount)?.name || availableAccounts[0]?.name || "";
+  const defaultToAccount = availableAccounts.find(({ name }) => name === initial?.toAccount)?.name
     || availableAccounts.find((account) => account.name !== defaultAccount)?.name
     || "";
   const [showNoteSuggestions, setShowNoteSuggestions] = useState(false);

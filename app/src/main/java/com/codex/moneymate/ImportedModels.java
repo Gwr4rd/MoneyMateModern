@@ -45,6 +45,7 @@ final class ImportedTxn {
     final double amount;
     final String note;
     final String description;
+    final String syncId;
     ImportedTxn(String date, String account, String category, String kind, double amount, String note) {
         this(date, "00:00", account, category, kind, amount, note);
     }
@@ -52,6 +53,9 @@ final class ImportedTxn {
         this(date, time, account, category, kind, amount, note, "");
     }
     ImportedTxn(String date, String time, String account, String category, String kind, double amount, String note, String description) {
+        this(date, time, account, category, kind, amount, note, description, "");
+    }
+    ImportedTxn(String date, String time, String account, String category, String kind, double amount, String note, String description, String syncId) {
         this.date = date == null || date.trim().isEmpty() ? "1970-01-01" : date;
         this.time = time == null || time.trim().isEmpty() ? "00:00" : time;
         this.account = account == null || account.trim().isEmpty() ? "Efectivo" : account;
@@ -60,6 +64,7 @@ final class ImportedTxn {
         this.amount = Math.abs(amount);
         this.note = note == null ? "" : note;
         this.description = description == null ? "" : description;
+        this.syncId = syncId == null ? "" : syncId;
     }
 }
 

@@ -80,8 +80,6 @@ public class MoneyMateActivity extends Activity {
     private String screen = "trans";
     private String transactionMode = "diario";
     private String accountMode = "diario";
-    private String statsKind = "expense";
-    private boolean statsBars;
     private String statsDetailAccount;
     private String statsScope = "mensual";
     private String statsAnchorDate;
@@ -482,75 +480,62 @@ public class MoneyMateActivity extends Activity {
     }
 
     private void renderTransactions() {
-        TransactionRange selectedRange = TransactionScopes.range(
-                transactionMode,
-                transactionAnchorDate,
-                db.latestDate(),
-                language
-        );
-        String start = selectedRange.start;
-        String end = selectedRange.end;
-        if ("buscar".equals(transactionMode)) {
-            start = searchFrom.isEmpty() ? null : searchFrom;
-            end = searchTo.isEmpty() ? null : searchTo;
-            if (start == null || end == null) {
-                start = null;
-                end = null;
-            }
-        }
+        boolean searching = "buscar".equals(transactionMode);
+        boolean daily = "diario".equals(transactionMode);
+        boolean total = "todo".equals(transactionMode);
+        TransactionRange range = TransactionScopes.range(transactionMode, transactionAnchorDate, db.latestDate(), language);
+        String start = searching || daily ? null : range.start;
+        String end = searching || daily ? null : range.end;
         List<MoneyDb.Row> rows = db.transactionsForDisplay(start, end);
-        if ("buscar".equals(transactionMode)) rows = filterTransactions(rows);
-        MoneyDb.Summary s = summaryForRows(rows);
-        LinearLayout summary = panel();
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.addView(kpi("Ingresos", money(s.income), incomeColor), new LinearLayout.LayoutParams(0, -2, 1));
-        row.addView(kpi("Gastos", money(s.expense), expenseColor), new LinearLayout.LayoutParams(0, -2, 1));
-        row.addView(kpi("Balance", money(s.balance), textColor), new LinearLayout.LayoutParams(0, -2, 1));
-        summary.addView(row);
-        content.addView(summary);
-        content.addView(dataStatusStrip(s));
-        content.addView(topAction("Nuevo movimiento", v -> movementDialog(null)));
-
-        LinearLayout filters = new LinearLayout(this);
-        filters.setOrientation(LinearLayout.HORIZONTAL);
-        Button search = searchModeButton();
-        search.setText(ui("Buscar"));
-        filters.addView(search, new LinearLayout.LayoutParams(0, dp(42), 1));
-        Button scope = smallButton(ui("buscar".equals(transactionMode) ? "Buscar" : scopeLabel(transactionMode)), v -> transactionScopeDialog());
-        setButtonIcon(scope, R.drawable.ic_action_filter, actionColor);
-        scope.setBackground(rounded(actionSoft, 8, 0, strokeColor));
-        LinearLayout.LayoutParams scopeParams = new LinearLayout.LayoutParams(dp(118), dp(42));
-        scopeParams.setMargins(dp(8), 0, 0, 0);
-        filters.addView(scope, scopeParams);
-        content.addView(filters, margins(-1, dp(42), 0, 6));
-        if (!"todo".equals(transactionMode) && !"buscar".equals(transactionMode)) {
-            TextView dateFilter = text(selectedRange.label, 12, true, muted);
-            dateFilter.setPadding(dp(5), dp(4), dp(5), dp(9));
-            dateFilter.setOnClickListener(v -> transactionDateDialog());
-            content.addView(dateFilter);
+        if (searching) {
+            rows = filterTransactions(rows);
+            if (!searchFrom.isEmpty()) rows.removeIf(row -> row.date.compareTo(searchFrom) < 0);
+            if (!searchTo.isEmpty()) rows.removeIf(row -> row.date.compareTo(searchTo) > 0);
         }
 
-        if ("buscar".equals(transactionMode)) content.addView(activeSearchStrip(rows.size()));
-        renderTransactionRows(rows, false);
+        LinearLayout periods = new LinearLayout(this);
+        periods.setPadding(dp(3), dp(3), dp(3), dp(3));
+        periods.setBackground(rounded(surface2, 24, 0, surface2));
+        String[] scopes = {"diario", "semanal", "mensual", "anual", "todo"};
+        for (String scope : scopes) {
+            periods.addView(modeButton(scopeLabel(scope), scope), new LinearLayout.LayoutParams(0, dp(42), 1));
+        }
+        content.addView(periods, margins(-1, -2, 0, 10));
+        content.addView(topAction("Nuevo movimiento", v -> movementDialog(null)));
+        content.addView(searchModeButton(), margins(-1, dp(42), 0, 8));
+        if (importInProgress) content.addView(empty("Cargando datos..."));
+        if (hasStoredSupabaseSession() && prefs.getBoolean("supabase_conflict", false)) {
+            TextView warning = text("Conflicto de sincronización", 12, true, transferColor);
+            warning.setOnClickListener(v -> supabaseDialog());
+            content.addView(warning, margins(-1, -2, 0, 8));
+        }
+
+        if (!daily && !searching) {
+            TextView dateFilter = section(total ? ui("Total") : range.label);
+            if (!total) dateFilter.setOnClickListener(v -> transactionDateDialog());
+            content.addView(dateFilter);
+            double income = 0, expense = 0, transfer = 0;
+            for (MoneyDb.Row row : rows) {
+                if (row.isTransfer()) transfer += row.amount;
+                else if ("income".equals(row.kind)) income += row.amount;
+                else if ("expense".equals(row.kind)) expense += row.amount;
+            }
+            LinearLayout summary = new LinearLayout(this);
+            summary.setPadding(0, dp(10), 0, dp(18));
+            summary.addView(kpi("Ingresos", money(income), incomeColor), new LinearLayout.LayoutParams(0, -2, 1));
+            summary.addView(kpi("Gastos", money(expense), expenseColor), new LinearLayout.LayoutParams(0, -2, 1));
+            summary.addView(kpi("Transferencias", money(transfer), transferColor), new LinearLayout.LayoutParams(0, -2, 1));
+            content.addView(summary);
+        }
+        if (searching) content.addView(activeSearchStrip(rows.size()));
+        if (!total) renderTransactionRows(rows, false);
     }
 
     private String transactionRangeLabel() {
-        if ("buscar".equals(transactionMode)) return "Busqueda";
+        if ("buscar".equals(transactionMode)) return ui("Busqueda");
+        if ("diario".equals(transactionMode) || "todo".equals(transactionMode)) return ui(scopeLabel(transactionMode));
         return TransactionScopes.range(transactionMode, transactionAnchorDate, db.latestDate(), language).label;
     }
-
-    private MoneyDb.Summary summaryForRows(List<MoneyDb.Row> rows) {
-        double income = 0;
-        double expense = 0;
-        for (MoneyDb.Row row : rows) {
-            if (row.isTransfer()) continue;
-            if ("income".equals(row.kind)) income += row.amount;
-            else if ("expense".equals(row.kind)) expense += row.amount;
-        }
-        return new MoneyDb.Summary(income, expense, income - expense, rows.size());
-    }
-
     private List<MoneyDb.Row> filterTransactions(List<MoneyDb.Row> rows) {
         List<MoneyDb.Row> out = new ArrayList<>();
         String query = searchQuery.trim().toLowerCase(Locale.US);
@@ -649,51 +634,115 @@ public class MoneyMateActivity extends Activity {
     }
 
     private void renderStats() {
-        DateRange range = statsRange();
-        MoneyDb.Summary s = db.summaryBetween(range.start, range.end);
         if (statsDetailAccount != null) {
             renderStatsDetail();
             return;
         }
-        List<MoneyDb.Bar> bars = db.accountFlowTotalsBetween(statsKind, range.start, range.end);
-
+        DateRange range = statsRange();
+        List<MoneyDb.Bar> incomes = db.accountFlowTotalsBetween("income", range.start, range.end);
+        List<MoneyDb.Bar> expenses = db.accountFlowTotalsBetween("expense", range.start, range.end);
         content.addView(statsPeriodHeader());
-        content.addView(statsTotalsHeader(s));
         content.addView(statusExportAction());
 
-        LinearLayout pieBox = panel();
-        LinearLayout chartHeader = new LinearLayout(this);
-        chartHeader.setOrientation(LinearLayout.HORIZONTAL);
-        chartHeader.setGravity(Gravity.CENTER_VERTICAL);
-        chartHeader.addView(text(statsBars ? "Barras por cuenta" : "Distribución por cuenta", 16, true, textColor), new LinearLayout.LayoutParams(0, -2, 1));
-        ImageButton chartSwitch = iconButton(statsBars ? R.drawable.ic_nav_status : R.drawable.ic_menu_report, v -> {
-            statsBars = !statsBars;
-            renderScreen();
-        });
-        chartSwitch.setContentDescription(ui(statsBars ? "Distribución por cuenta" : "Barras por cuenta"));
-        chartSwitch.setColorFilter(actionColor);
-        chartSwitch.setBackground(rounded(controlSurface(), 8, 0, strokeColor));
-        chartHeader.addView(chartSwitch, new LinearLayout.LayoutParams(dp(42), dp(38)));
-        pieBox.addView(chartHeader);
-        if (bars.isEmpty()) pieBox.addView(empty("Sin datos en este periodo."));
-        else if (!statsBars) {
-            PieChartView pie = new PieChartView(this);
-            pie.setData(bars);
-            pie.setThemeColors(textColor, muted, surface2);
-            pie.setCenterText(String.valueOf(bars.size()), ui(bars.size() == 1 ? "Cuenta" : "Cuentas"));
-            pie.setContentDescription(ui("Distribución por cuenta"));
-            pieBox.addView(pie, new LinearLayout.LayoutParams(-1, dp(184)));
-            animateChart(pie);
+        LinearLayout charts = new LinearLayout(this);
+        charts.addView(statusChart("Ingresos", incomes, incomeColor), new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout.LayoutParams right = new LinearLayout.LayoutParams(0, -2, 1);
+        right.leftMargin = dp(8);
+        charts.addView(statusChart("Gastos", expenses, expenseColor), right);
+        content.addView(charts, margins(-1, -2, 0, 8));
+        if (incomes.isEmpty() && expenses.isEmpty()) {
+            content.addView(empty("Sin datos en este periodo."));
+            return;
         }
-        content.addView(pieBox);
 
-        double total = 0;
-        for (MoneyDb.Bar b : bars) total += b.value;
-        for (int i = 0; i < bars.size(); i++) {
-            content.addView(statCategoryRow(bars.get(i), total, i));
+        Map<String, double[]> byAccount = new LinkedHashMap<>();
+        double max = 0, balance = 0;
+        for (MoneyDb.Bar bar : incomes) {
+            byAccount.computeIfAbsent(bar.label, k -> new double[2])[0] = bar.value;
+            max = Math.max(max, bar.value);
+            balance += bar.value;
+        }
+        for (MoneyDb.Bar bar : expenses) {
+            byAccount.computeIfAbsent(bar.label, k -> new double[2])[1] = bar.value;
+            max = Math.max(max, bar.value);
+            balance -= bar.value;
+        }
+        TextView net = kpi("Balance", money(balance), textColor);
+        net.setPadding(0, dp(8), 0, dp(8));
+        content.addView(net);
+
+        Map<String, String> types = new LinkedHashMap<>();
+        for (MoneyDb.AccountTotal account : db.accountTotals()) types.put(account.name, displayAccountType(account.type));
+        Map<String, List<String>> groups = new LinkedHashMap<>();
+        for (String name : byAccount.keySet()) {
+            String type = types.getOrDefault(name, "Cuentas de Banco");
+            groups.computeIfAbsent(type, k -> new ArrayList<>()).add(name);
+        }
+        List<String> orderedTypes = new ArrayList<>(groups.keySet());
+        orderedTypes.sort(Comparator.comparing((String type) -> !"Efectivo".equals(type)).thenComparing(String.CASE_INSENSITIVE_ORDER));
+        for (String type : orderedTypes) {
+            content.addView(section(type));
+            for (String name : groups.get(type)) {
+                double[] values = byAccount.get(name);
+                LinearLayout row = panel();
+                row.addView(text(name, 14, true, textColor));
+                row.addView(flowBar("Ingresos", values[0], max, incomeColor));
+                row.addView(flowBar("Gastos", values[1], max, expenseColor));
+                row.setOnClickListener(v -> {
+                    statsDetailAccount = name;
+                    renderScreen();
+                });
+                content.addView(row);
+            }
         }
     }
 
+    private View statusChart(String label, List<MoneyDb.Bar> values, int color) {
+        LinearLayout box = panel();
+        TextView title = text(label, 15, true, color);
+        title.setGravity(Gravity.CENTER);
+        box.addView(title);
+        PieChartView pie = new PieChartView(this);
+        pie.setData(values);
+        pie.setThemeColors(textColor, muted, surface2);
+        pie.setContentDescription(ui(label));
+        box.addView(pie, new LinearLayout.LayoutParams(-1, dp(124)));
+        double total = 0;
+        for (MoneyDb.Bar bar : values) total += bar.value;
+        TextView amount = text(money(total), 15, true, color);
+        amount.setGravity(Gravity.CENTER);
+        box.addView(amount);
+        for (int i = 0; i < values.size(); i++) {
+            MoneyDb.Bar bar = values.get(i);
+            TextView legend = text("●  " + bar.label, 11, false, muted);
+            SpannableString labelText = new SpannableString(legend.getText());
+            labelText.setSpan(new ForegroundColorSpan(statColor(i)), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+            legend.setText(labelText);
+            box.addView(legend);
+        }
+        return box;
+    }
+
+    private View flowBar(String label, double value, double max, int color) {
+        LinearLayout line = new LinearLayout(this);
+        line.setGravity(Gravity.CENTER_VERTICAL);
+        line.setPadding(0, dp(5), 0, 0);
+        line.addView(text(label, 11, false, muted), new LinearLayout.LayoutParams(dp(66), -2));
+        LinearLayout track = new LinearLayout(this);
+        track.setBackground(rounded(surface2, 3, 0, surface2));
+        track.setWeightSum(1f);
+        if (value > 0 && max > 0) {
+            View fill = new View(this);
+            fill.setBackground(rounded(color, 3, 0, color));
+            track.addView(fill, new LinearLayout.LayoutParams(0, dp(6), (float) (value / max)));
+        }
+        line.addView(track, new LinearLayout.LayoutParams(0, dp(6), 1));
+        TextView amount = text(money(value), 12, true, color);
+        amount.setGravity(Gravity.END);
+        amount.setPadding(dp(6), 0, 0, 0);
+        line.addView(amount, new LinearLayout.LayoutParams(dp(100), -2));
+        return line;
+    }
     private void renderStatsDetail() {
         LinearLayout head = new LinearLayout(this);
         head.setOrientation(LinearLayout.HORIZONTAL);
@@ -712,28 +761,26 @@ public class MoneyMateActivity extends Activity {
         content.addView(head);
 
         List<MoneyDb.Row> rows = filteredAccountRows();
-        double total = 0;
-        for (MoneyDb.Row row : rows) total += row.amount;
-        LinearLayout balance = compactPanel();
-        balance.addView(kpi("Balance total", money(total), "income".equals(statsKind) ? incomeColor : expenseColor));
-        content.addView(balance);
-
-        TrendChartView trend = new TrendChartView(this);
-        trend.setRows(rows);
+        List<MoneyDb.Row> flowRows = new ArrayList<>();
+        for (MoneyDb.Row row : rows) {
+            if (!row.isTransfer()) {
+                flowRows.add(row);
+                continue;
+            }
+            String kind = statsDetailAccount.equals(row.transferTo) ? "income" : "expense";
+            flowRows.add(new MoneyDb.Row(row.id, row.date, row.time, statsDetailAccount, "",
+                    kind, row.amount, row.note, row.description));
+        }
         DateRange range = statsRange();
+        TrendChartView trend = new TrendChartView(this);
+        trend.setRows(flowRows);
         trend.setRange(range.start, range.end, statsScope);
-        trend.setKind(statsKind);
         trend.setLegendLabels(ui("Ingresos"), ui("Gastos"));
         trend.setThemeColors(textColor, muted, surface2, incomeColor, expenseColor);
         LinearLayout chart = panel();
         chart.addView(text("Actividad del periodo", 16, true, textColor));
-        TextView chartHint = text("Ingresos y gastos distribuidos en el tiempo", 12, false, muted);
-        chartHint.setPadding(0, dp(3), 0, dp(6));
-        chart.addView(chartHint);
         chart.addView(trend, new LinearLayout.LayoutParams(-1, dp(184)));
         content.addView(chart);
-        animateChart(trend);
-
         renderTransactionRows(rows, false);
     }
 
@@ -741,12 +788,8 @@ public class MoneyMateActivity extends Activity {
         List<MoneyDb.Row> out = new ArrayList<>();
         DateRange range = statsRange();
         for (MoneyDb.Row row : db.transactionsForDisplay(range.start, range.end)) {
-            if (row.isTransfer()) {
-                String account = "income".equals(statsKind) ? row.transferTo : row.transferFrom;
-                if (statsDetailAccount.equals(account)) out.add(row);
-            } else if (row.account.equals(statsDetailAccount) && row.kind.equals(statsKind)) {
-                out.add(row);
-            }
+            if (row.isTransfer() ? statsDetailAccount.equals(row.transferFrom) || statsDetailAccount.equals(row.transferTo)
+                    : statsDetailAccount.equals(row.account)) out.add(row);
         }
         return out;
     }
@@ -805,53 +848,6 @@ public class MoneyMateActivity extends Activity {
         return control;
     }
 
-    private LinearLayout statsTotalsHeader(MoneyDb.Summary s) {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.HORIZONTAL);
-        box.setLayoutParams(margins(-1, -2, 0, 10));
-        boolean incomeSelected = "income".equals(statsKind);
-        TextView income = statsMetricTab("Ingresos", money(s.income), incomeColor, incomeSelected);
-        income.setOnClickListener(v -> {
-            statsKind = "income";
-            statsDetailAccount = null;
-            renderScreen();
-        });
-        LinearLayout.LayoutParams incomeParams = new LinearLayout.LayoutParams(0, dp(68), 1);
-        incomeParams.setMargins(0, 0, dp(5), 0);
-        box.addView(income, incomeParams);
-        TextView expense = statsMetricTab("Gastos", money(s.expense), expenseColor, !incomeSelected);
-        expense.setOnClickListener(v -> {
-            statsKind = "expense";
-            statsDetailAccount = null;
-            renderScreen();
-        });
-        LinearLayout.LayoutParams expenseParams = new LinearLayout.LayoutParams(0, dp(68), 1);
-        expenseParams.setMargins(dp(5), 0, 0, 0);
-        box.addView(expense, expenseParams);
-        TextView balance = statsMetricTab("Balance", money(s.balance), textColor, false);
-        LinearLayout.LayoutParams balanceParams = new LinearLayout.LayoutParams(0, dp(68), 1);
-        balanceParams.setMargins(dp(5), 0, 0, 0);
-        box.addView(balance, balanceParams);
-        return box;
-    }
-
-    private TextView statsMetricTab(String label, String value, int color, boolean selected) {
-        String translated = ui(label);
-        String full = translated + "\n" + value;
-        SpannableString span = new SpannableString(full);
-        span.setSpan(new ForegroundColorSpan(selected ? color : muted), 0, translated.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-        int valueStart = translated.length() + 1;
-        span.setSpan(new ForegroundColorSpan(selected || "Balance".equals(label) ? textColor : muted), valueStart, full.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-        span.setSpan(new StyleSpan(Typeface.BOLD), valueStart, full.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-        span.setSpan(new RelativeSizeSpan(1.24f), valueStart, full.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-        TextView view = text("", 13, false, textColor);
-        view.setText(span);
-        view.setGravity(Gravity.CENTER);
-        view.setBackground(rounded(selected ? ("Ingresos".equals(label) ? softIncome() : softExpense()) : surface, 8, 0, strokeColor));
-        view.setPadding(dp(8), dp(8), dp(8), dp(8));
-        return view;
-    }
-
     private TextView navText(String value, View.OnClickListener listener) {
         TextView v = text(value, 30, false, textColor);
         v.setGravity(Gravity.CENTER);
@@ -865,58 +861,6 @@ public class MoneyMateActivity extends Activity {
         box.setPadding(0, dp(4), 0, dp(6));
         box.setLayoutParams(margins(-1, -2, 0, 4));
         return box;
-    }
-
-    private View statCategoryRow(MoneyDb.Bar bar, double total, int index) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.VERTICAL);
-        row.setBackground(rounded(surface, 8, 0, strokeColor));
-        row.setPadding(dp(12), dp(10), dp(12), dp(10));
-        row.setLayoutParams(margins(-1, -2, 0, 6));
-
-        int color = statColor(index);
-        int pct = total <= 0 ? 0 : (int) Math.round(100d * bar.value / total);
-        LinearLayout top = new LinearLayout(this);
-        top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        View dot = new View(this);
-        dot.setBackground(rounded(color, 5, 0, color));
-        LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(10), dp(10));
-        dotParams.setMargins(0, 0, dp(9), 0);
-        top.addView(dot, dotParams);
-        TextView label = text(bar.label, 14, true, textColor);
-        label.setGravity(Gravity.CENTER_VERTICAL);
-        label.setPadding(0, 0, dp(8), 0);
-        label.setMaxLines(2);
-        top.addView(label, new LinearLayout.LayoutParams(0, dp(38), 1));
-
-        TextView amount = text(money(bar.value), 14, true, textColor);
-        amount.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        top.addView(amount, new LinearLayout.LayoutParams(dp(116), dp(38)));
-        row.addView(top);
-
-        LinearLayout detail = new LinearLayout(this);
-        detail.setOrientation(LinearLayout.HORIZONTAL);
-        detail.setGravity(Gravity.CENTER_VERTICAL);
-        TextView percent = text(pct + "% " + ui("del total"), 11, true, color);
-        detail.addView(percent, new LinearLayout.LayoutParams(0, dp(24), 1));
-        row.addView(detail);
-
-        LinearLayout track = new LinearLayout(this);
-        track.setOrientation(LinearLayout.HORIZONTAL);
-        track.setWeightSum(100f);
-        track.setBackground(rounded(surface2, 3, 0, strokeColor));
-        View fill = new View(this);
-        fill.setBackground(rounded(color, 3, 0, color));
-        float fillWeight = Math.max(1f, Math.min(100f, pct));
-        track.addView(fill, new LinearLayout.LayoutParams(0, dp(6), fillWeight));
-        track.addView(new View(this), new LinearLayout.LayoutParams(0, dp(6), 100f - fillWeight));
-        row.addView(track, new LinearLayout.LayoutParams(-1, dp(6)));
-        row.setOnClickListener(v -> {
-            statsDetailAccount = bar.label;
-            renderScreen();
-        });
-        return row;
     }
 
     private int statColor(int index) {
@@ -1272,7 +1216,7 @@ public class MoneyMateActivity extends Activity {
         amount.setBackground(rounded(actionSoft, 8, 1, actionColor));
         amount.setLayoutParams(margins(-1, dp(60), 0, 10));
         if (copyFrom != null) amount.setText(String.format(Locale.US, "%.2f", copyFrom.amount));
-        List<AccountSelectionOption> accountChoices = movementAccountChoices();
+        List<AccountSelectionOption> accountChoices = movementAccountChoices(editMode ? copyFrom : null);
         String initialAccountName = copyFrom == null ? prefs.getString("last_movement_account", "")
                 : (copyFrom.isTransfer() && !copyFrom.transferFrom.isEmpty() ? copyFrom.transferFrom : copyFrom.account);
         String initialToAccountName = copyFrom == null ? "" : copyFrom.transferTo;
@@ -1481,12 +1425,7 @@ public class MoneyMateActivity extends Activity {
                 return false;
             }
             if (editSource != null) {
-                if (editSource.isTransfer()) {
-                    db.updateTransfer(editSource, d, t, from, to, value, n, desc);
-                } else {
-                    db.deleteMovement(editSource);
-                    db.addTransfer(d, t, from, to, value, n, desc);
-                }
+                db.updateTransfer(editSource, d, t, from, to, value, n, desc);
             } else {
                 db.addTransfer(d, t, from, to, value, n, desc);
             }
@@ -1494,8 +1433,7 @@ public class MoneyMateActivity extends Activity {
             String kind = rule.kind;
             if (editSource != null) {
                 if (editSource.isTransfer()) {
-                    db.deleteMovement(editSource);
-                    db.addTransaction(d, t, account.getSelectedItem().toString(), movementCategory(category, kind), kind, value, n, desc);
+                    db.convertTransfer(editSource, d, t, account.getSelectedItem().toString(), movementCategory(category, kind), kind, value, n, desc);
                 } else {
                     db.updateTransaction(editSource.id, d, t, account.getSelectedItem().toString(), movementCategory(category, kind), kind, value, n, desc);
                 }
@@ -1508,21 +1446,6 @@ public class MoneyMateActivity extends Activity {
         prefs.edit().putString("last_movement_account", account.getSelectedItem().toString()).apply();
         markLocalDataChanged();
         return true;
-    }
-
-    private void transactionScopeDialog() {
-        String[] labels = labels("Diario", "Semanal", "Mensual", "Anual", "Todo").toArray(new String[0]);
-        String[] values = {"diario", "semanal", "mensual", "anual", "todo"};
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(ui("Periodo"))
-                .setItems(labels, (d, which) -> {
-                    transactionMode = values[which];
-                    renderScreen();
-                })
-                .setNegativeButton(ui("Cancelar"), null)
-                .create();
-        dialog.show();
-        styleDialog(dialog);
     }
 
     private String movementCategory(Spinner category, String kind) {
@@ -2006,7 +1929,18 @@ public class MoneyMateActivity extends Activity {
         AlertDialog[] holder = new AlertDialog[1];
         form.addView(iconActionWide(conflict ? "Conservar copia local y subir" : "Subir copia local ahora", R.drawable.ic_menu_sync, v -> {
             holder[0].dismiss();
-            runSupabaseSync(true, url, key);
+            if (!conflict) {
+                runSupabaseSync(true, false, url, key);
+                return;
+            }
+            AlertDialog confirm = new AlertDialog.Builder(this)
+                    .setTitle(ui("Sincronización"))
+                    .setMessage(ui("¿Reemplazar la copia de la nube con los cambios locales?"))
+                    .setNegativeButton(ui("Cancelar"), null)
+                    .setPositiveButton(ui("Continuar"), (d, w) -> runSupabaseSync(true, true, url, key))
+                    .create();
+            confirm.show();
+            styleDialog(confirm);
         }));
         form.addView(iconSmallButton(conflict ? "Usar copia de la nube" : "Descargar copia de la nube", R.drawable.ic_menu_import, v -> {
             holder[0].dismiss();
@@ -2042,50 +1976,78 @@ public class MoneyMateActivity extends Activity {
                 .setTitle("Reemplazar datos locales")
                 .setMessage("La copia de Supabase reemplazara las cuentas y transacciones guardadas en este dispositivo.")
                 .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Descargar", (d, w) -> runSupabaseSync(false, url, key))
+                .setPositiveButton("Descargar", (d, w) -> runSupabaseSync(false, false, url, key))
                 .create();
         dialog.show();
         styleDialog(dialog);
     }
 
-    private void runSupabaseSync(boolean upload, String url, String key) {
+    private void runSupabaseSync(boolean upload, boolean overwrite, String url, String key) {
         if (!claimSyncOperation()) {
             toast("Ya hay una sincronización en curso.");
             return;
         }
         toast(upload ? "Subiendo datos..." : "Descargando datos...");
+        long revision = prefs.getLong("supabase_local_revision", 0);
+        String expected = overwrite ? null : prefs.getString("supabase_remote_updated_at", "");
         new Thread(() -> {
             try {
                 SupabaseSync.Session session = storedSupabaseSession(url, key);
                 if (upload) {
-                    long revision = prefs.getLong("supabase_local_revision", 0);
-                    String updatedAt = SupabaseSync.upload(url.trim(), key.trim(), session, cloudSnapshotJson());
-                    recordUploadSuccess(revision, updatedAt);
+                    String updatedAt = SupabaseSync.upload(url.trim(), key.trim(), session, cloudSnapshotJson(), expected);
+                    runOnUiThread(() -> {
+                        recordUploadSuccess(revision, updatedAt);
+                        toast("Copia subida a Supabase.");
+                        draw();
+                    });
                 } else {
                     SupabaseSync.RemoteSnapshot remote = SupabaseSync.download(url.trim(), key.trim(), session);
-                    replaceFromCloudSnapshot(remote.data);
-                    prefs.edit()
-                            .putString("supabase_remote_updated_at", remote.updatedAt)
-                            .putBoolean("supabase_pending_upload", false)
-                            .putBoolean("supabase_conflict", false)
-                            .apply();
+                    runOnUiThread(() -> {
+                        if (revision != prefs.getLong("supabase_local_revision", 0)) {
+                            toast("Hay cambios posteriores a la confirmación. Vuelve a descargar la copia.");
+                            return;
+                        }
+                        applyRemoteSnapshot(remote);
+                    });
                 }
-                runOnUiThread(() -> {
-                    prefs.edit()
-                            .putLong("last_supabase_sync", System.currentTimeMillis())
-                            .remove("supabase_last_error")
-                            .apply();
-                    period = db.latestMonth();
-                    statsAnchorDate = db.latestDate();
-                    toast(upload ? "Copia subida a Supabase." : "Datos descargados desde Supabase.");
-                    draw();
-                });
+            } catch (SupabaseSync.SnapshotConflict ex) {
+                runOnUiThread(this::showSyncConflict);
             } catch (Exception ex) {
                 runOnUiThread(() -> toast("No se pudo sincronizar: " + ex.getMessage()));
             } finally {
                 releaseSyncOperation();
             }
         }).start();
+    }
+
+    private void applyRemoteSnapshot(SupabaseSync.RemoteSnapshot remote) {
+        try {
+            replaceFromCloudSnapshot(remote.data);
+            prefs.edit()
+                    .putString("supabase_remote_updated_at", remote.updatedAt)
+                    .putLong("last_supabase_sync", System.currentTimeMillis())
+                    .putBoolean("supabase_pending_upload", false)
+                    .putBoolean("supabase_conflict", false)
+                    .remove("supabase_last_error")
+                    .apply();
+            period = db.latestMonth();
+            statsAnchorDate = db.latestDate();
+            transactionAnchorDate = db.latestDate();
+            toast("Datos descargados desde Supabase.");
+            draw();
+        } catch (Exception ex) {
+            prefs.edit().putString("supabase_last_error", String.valueOf(ex.getMessage())).apply();
+            toast("No se pudo sincronizar: " + ex.getMessage());
+        }
+    }
+
+    private void showSyncConflict() {
+        prefs.edit()
+                .putBoolean("supabase_conflict", true)
+                .putString("supabase_last_error", "Hay cambios locales y en la nube. Abre Sincronización y elige qué copia conservar.")
+                .apply();
+        toast("Conflicto de sincronización");
+        renderScreen();
     }
 
     private void markLocalDataChanged() {
@@ -2104,7 +2066,8 @@ public class MoneyMateActivity extends Activity {
     }
 
     private void runPendingAutoSync() {
-        if (!prefs.getBoolean("supabase_pending_upload", false) || !hasStoredSupabaseSession()) return;
+        if (!prefs.getBoolean("supabase_pending_upload", false)
+                || prefs.getBoolean("supabase_conflict", false) || !hasStoredSupabaseSession()) return;
         String url = prefs.getString("supabase_url", "").trim();
         String key = prefs.getString("supabase_key", "").trim();
         if (url.isEmpty() || key.isEmpty()) return;
@@ -2113,12 +2076,14 @@ public class MoneyMateActivity extends Activity {
             return;
         }
         long revision = prefs.getLong("supabase_local_revision", 0);
+        String expectedVersion = prefs.getString("supabase_remote_updated_at", "");
         new Thread(() -> {
             try {
                 SupabaseSync.Session session = storedSupabaseSession(url, key);
-                if (detectRemoteConflict(url, key, session)) return;
-                String updatedAt = SupabaseSync.upload(url, key, session, cloudSnapshotJson());
-                recordUploadSuccess(revision, updatedAt);
+                String updatedAt = SupabaseSync.upload(url, key, session, cloudSnapshotJson(), expectedVersion);
+                runOnUiThread(() -> recordUploadSuccess(revision, updatedAt));
+            } catch (SupabaseSync.SnapshotConflict ex) {
+                runOnUiThread(this::showSyncConflict);
             } catch (Exception ex) {
                 prefs.edit().putString("supabase_last_error", String.valueOf(ex.getMessage())).apply();
             } finally {
@@ -2160,22 +2125,20 @@ public class MoneyMateActivity extends Activity {
             releaseSyncOperation();
             return;
         }
+        long revision = prefs.getLong("supabase_local_revision", 0);
         new Thread(() -> {
-            boolean changed = false;
             try {
                 SupabaseSync.Session session = storedSupabaseSession(url, key);
                 SupabaseSync.RemoteSnapshot remote = SupabaseSync.download(url, key, session);
                 String previous = prefs.getString("supabase_remote_updated_at", "");
-                if (previous.isEmpty()) {
-                    prefs.edit().putString("supabase_remote_updated_at", remote.updatedAt).apply();
-                } else if (!remote.updatedAt.isEmpty() && !remote.updatedAt.equals(previous)) {
-                    replaceFromCloudSnapshot(remote.data);
-                    prefs.edit()
-                            .putString("supabase_remote_updated_at", remote.updatedAt)
-                            .putLong("last_supabase_sync", System.currentTimeMillis())
-                            .remove("supabase_last_error")
-                            .apply();
-                    changed = true;
+                if (!remote.updatedAt.isEmpty() && !remote.updatedAt.equals(previous)) {
+                    runOnUiThread(() -> {
+                        if (revision != prefs.getLong("supabase_local_revision", 0)
+                                || prefs.getBoolean("supabase_pending_upload", false)
+                                || !session.userId.equals(prefs.getString("supabase_user_id", ""))) return;
+                        if (previous.isEmpty()) showSyncConflict();
+                        else applyRemoteSnapshot(remote);
+                    });
                 }
             } catch (Exception ex) {
                 String message = String.valueOf(ex.getMessage());
@@ -2185,32 +2148,7 @@ public class MoneyMateActivity extends Activity {
             } finally {
                 releaseSyncOperation();
             }
-            if (changed) {
-                runOnUiThread(() -> {
-                    period = db.latestMonth();
-                    statsAnchorDate = db.latestDate();
-                    draw();
-                    toast("Cambios recibidos desde Supabase.");
-                });
-            }
         }).start();
-    }
-
-    private boolean detectRemoteConflict(String url, String key, SupabaseSync.Session session) throws Exception {
-        try {
-            SupabaseSync.RemoteSnapshot remote = SupabaseSync.download(url, key, session);
-            String previous = prefs.getString("supabase_remote_updated_at", "");
-            if (!remote.updatedAt.isEmpty() && (previous.isEmpty() || !remote.updatedAt.equals(previous))) {
-                prefs.edit()
-                        .putBoolean("supabase_conflict", true)
-                        .putString("supabase_last_error", "Hay cambios locales y en la nube. Abre Sincronización y elige qué copia conservar.")
-                        .apply();
-                return true;
-            }
-        } catch (Exception ex) {
-            if (!String.valueOf(ex.getMessage()).contains("Todavia no existe")) throw ex;
-        }
-        return false;
     }
 
     private boolean claimSyncOperation() {
@@ -2500,7 +2438,7 @@ public class MoneyMateActivity extends Activity {
         if ("semestral".equals(scope)) return "Semestral";
         if ("semanal".equals(scope)) return "Semanal";
         if ("diario".equals(scope)) return "Diario";
-        if ("todo".equals(scope)) return "Todo";
+        if ("todo".equals(scope)) return "Total";
         return "Mensual";
     }
 
@@ -2644,8 +2582,7 @@ public class MoneyMateActivity extends Activity {
                     MmbakImporter importer = new MmbakImporter(this);
                     result = importer.importInto(uri, previewDb);
                 }
-                int duplicatesRemoved = previewDb.removeExactDuplicateTransactions();
-                ImportPreview preview = ImportSafety.analyze(fileName, db, previewDb, duplicatesRemoved);
+                ImportPreview preview = ImportSafety.analyze(fileName, db, previewDb, 0);
                 MoneyDb.ImportBundle bundle = previewDb.exportImportBundle();
                 previewDb.close();
                 previewDb = null;
@@ -2730,7 +2667,7 @@ public class MoneyMateActivity extends Activity {
                     recoveryPreferences.remove("last_import_currency");
                 }
                 recoveryPreferences.apply();
-                db.replaceFromImport(bundle.accounts, bundle.categories, bundle.transactions);
+                db.replaceFromImport(bundle.accounts, bundle.categories, bundle.transactions, bundle.accountTypes);
                 runOnUiThread(() -> {
                     if (!prefs.contains("currency_code")) prefs.edit().putString("currency_code", db.primaryCurrency()).apply();
                     prefs.edit()
@@ -2905,101 +2842,34 @@ public class MoneyMateActivity extends Activity {
 
     private ImportResult importJson(Uri uri, MoneyDb target) throws Exception {
         Object raw = new org.json.JSONTokener(readText(uri)).nextValue();
-        List<ImportedAccount> accounts = new ArrayList<>();
-        List<ImportedCategory> categories = new ArrayList<>();
-        List<ImportedTxn> txns = new ArrayList<>();
-        JSONArray txnArray;
-        if (raw instanceof JSONArray) {
-            txnArray = (JSONArray) raw;
-        } else {
-            JSONObject root = (JSONObject) raw;
-            JSONArray accountArray = root.optJSONArray("accounts");
-            if (accountArray != null) {
-                for (int i = 0; i < accountArray.length(); i++) {
-                    JSONObject a = accountArray.getJSONObject(i);
-                    accounts.add(new ImportedAccount(a.optString("name", a.optString("nombre", "Cuenta")),
-                            a.optDouble("balance", a.optDouble("saldo", 0)),
-                            a.optString("currency", a.optString("moneda", currentCurrencyCode())),
-                            a.optString("type", a.optString("tipo", "")),
-                            a.optString("description", a.optString("descripcion", "")),
-                            a.optBoolean("includeTotal", true),
-                            a.optBoolean("hidden", false)));
-                }
-            }
-            JSONArray categoryArray = root.optJSONArray("categories");
-            if (categoryArray != null) {
-                for (int i = 0; i < categoryArray.length(); i++) {
-                    JSONObject c = categoryArray.getJSONObject(i);
-                    categories.add(new ImportedCategory(c.optString("name", c.optString("nombre", "Sin categoria")),
-                            normalizeKind(c.optString("kind", c.optString("tipo", "expense"))),
-                            c.optString("color", "")));
-                }
-            }
-            txnArray = root.optJSONArray("transactions");
-            if (txnArray == null) txnArray = root.optJSONArray("movements");
-            if (txnArray == null) txnArray = new JSONArray();
-        }
-        for (int i = 0; i < txnArray.length(); i++) {
-            JSONObject t = txnArray.getJSONObject(i);
-            txns.add(new ImportedTxn(t.optString("date", t.optString("fecha", today())),
-                    t.optString("time", t.optString("hora", "00:00")),
-                    t.optString("account", t.optString("cuenta", "Efectivo")),
-                    t.optString("category", t.optString("categoria", "Sin categoria")),
-                    normalizeKind(t.optString("kind", t.optString("tipo", "expense"))),
-                    t.optDouble("amount", t.optDouble("importe", t.optDouble("monto", 0))),
-                    t.optString("note", t.optString("nota", "")),
-                    t.optString("description", t.optString("descripcion", ""))));
-        }
-        completeImportLists(accounts, categories, txns);
-        target.replaceFromImport(accounts, categories, txns);
-        return new ImportResult(accounts.size(), categories.size(), txns.size());
+        if (raw instanceof JSONArray) raw = new JSONObject().put("transactions", raw);
+        if (!(raw instanceof JSONObject)) throw new IllegalArgumentException("El archivo JSON no es un respaldo válido.");
+        return readJsonSnapshot((JSONObject) raw, target);
     }
 
     private void exportJson(Uri uri) throws Exception {
-        JSONObject root = new JSONObject();
-        root.put("version", 1);
-        root.put("currency", currentCurrencyCode());
-        JSONArray accounts = new JSONArray();
-        for (MoneyDb.AccountTotal a : db.accountTotals()) {
-            JSONObject item = new JSONObject();
-            item.put("name", a.name);
-            item.put("currency", a.currency);
-            item.put("type", a.type);
-            item.put("balance", a.balance - a.income + a.expense);
-            item.put("description", a.description);
-            item.put("includeTotal", a.includeTotal);
-            item.put("hidden", a.hidden);
-            accounts.put(item);
-        }
-        root.put("accounts", accounts);
-        JSONArray categories = new JSONArray();
-        for (MoneyDb.CategoryOption c : db.categoryOptions("expense")) categories.put(categoryJson(c));
-        for (MoneyDb.CategoryOption c : db.categoryOptions("income")) categories.put(categoryJson(c));
-        root.put("categories", categories);
-        JSONArray txns = new JSONArray();
-        for (MoneyDb.Row r : db.allTransactions()) {
-            JSONObject item = new JSONObject();
-            item.put("date", r.date);
-            item.put("time", r.time);
-            item.put("account", r.account);
-            item.put("category", r.category);
-            item.put("kind", r.kind);
-            item.put("amount", r.amount);
-            item.put("note", r.note);
-            item.put("description", r.description);
-            txns.put(item);
-        }
-        root.put("transactions", txns);
         try (OutputStream out = getContentResolver().openOutputStream(uri);
-             Writer writer = new OutputStreamWriter(out)) {
-            writer.write(root.toString(2));
+             Writer writer = new OutputStreamWriter(out, java.nio.charset.StandardCharsets.UTF_8)) {
+            writer.write(cloudSnapshotJson().toString(2));
+        }
+    }
+    private JSONObject cloudSnapshotJson() throws Exception {
+        android.database.sqlite.SQLiteDatabase database = db.getReadableDatabase();
+        database.beginTransactionNonExclusive();
+        try {
+            JSONObject snapshot = buildSnapshotJson();
+            database.setTransactionSuccessful();
+            return snapshot;
+        } finally {
+            database.endTransaction();
         }
     }
 
-    private JSONObject cloudSnapshotJson() throws Exception {
+    private JSONObject buildSnapshotJson() throws Exception {
         JSONObject root = new JSONObject();
         root.put("version", 2);
         root.put("currency", currentCurrencyCode());
+        root.put("accountTypes", new JSONArray(db.accountTypes()));
         JSONArray accounts = new JSONArray();
         for (MoneyDb.AccountTotal account : db.accountTotals()) {
             JSONObject item = new JSONObject();
@@ -3020,11 +2890,14 @@ public class MoneyMateActivity extends Activity {
         JSONArray transactions = new JSONArray();
         for (MoneyDb.Row row : db.transactionsForDisplay(null, null)) {
             JSONObject item = new JSONObject();
+            boolean transfer = row.isTransfer() && !row.transferFrom.isEmpty() && !row.transferTo.isEmpty();
+            String kind = transfer ? "transfer" : row.isTransfer() ? (row.transferFrom.isEmpty() ? "income" : "expense") : row.kind;
+            if (!row.syncId.isEmpty()) item.put("id", row.syncId);
             item.put("date", row.date);
             item.put("time", row.time);
-            item.put("kind", row.isTransfer() ? "transfer" : row.kind);
-            item.put("account", row.isTransfer() ? row.transferFrom : row.account);
-            item.put("toAccount", row.isTransfer() ? row.transferTo : "");
+            item.put("kind", kind);
+            item.put("account", transfer ? row.transferFrom : row.account);
+            item.put("toAccount", transfer ? row.transferTo : "");
             item.put("category", row.isTransfer() ? "Transferencia" : row.category);
             item.put("amount", row.amount);
             item.put("note", row.note);
@@ -3035,21 +2908,41 @@ public class MoneyMateActivity extends Activity {
         return root;
     }
 
-    private ImportResult replaceFromCloudSnapshot(JSONObject root) throws Exception {
+    private void replaceFromCloudSnapshot(JSONObject root) throws Exception {
+        readJsonSnapshot(root, db);
+        String currency = root.optString("currency", "");
+        if (currency.matches("[A-Z]{3}")) prefs.edit().putString("currency_code", currency).apply();
+    }
+
+    private ImportResult readJsonSnapshot(JSONObject root, MoneyDb target) throws Exception {
         List<ImportedAccount> accounts = new ArrayList<>();
         List<ImportedCategory> categories = new ArrayList<>();
         List<ImportedTxn> txns = new ArrayList<>();
+        List<String> types = new ArrayList<>();
         String currency = root.optString("currency", currentCurrencyCode());
+        JSONArray transactionArray = root.optJSONArray("transactions");
+        if (transactionArray == null) transactionArray = root.optJSONArray("movements");
+        int version = root.optInt("version", 0);
+        if (transactionArray == null || (transactionArray.length() == 0 && version != 1 && version != 2)) {
+            throw new IllegalArgumentException("El archivo JSON no es un respaldo válido.");
+        }
+        JSONArray typeArray = root.optJSONArray("accountTypes");
+        if (typeArray != null) {
+            for (int i = 0; i < typeArray.length(); i++) {
+                String type = typeArray.getString(i).trim();
+                if (!type.isEmpty()) types.add(type);
+            }
+        }
         JSONArray accountArray = root.optJSONArray("accounts");
         if (accountArray != null) {
             for (int i = 0; i < accountArray.length(); i++) {
                 JSONObject account = accountArray.getJSONObject(i);
                 accounts.add(new ImportedAccount(
-                        account.optString("name", "Cuenta"),
-                        account.optDouble("balance", 0),
-                        account.optString("currency", currency),
-                        account.optString("type", "Cuentas de Banco"),
-                        account.optString("description", ""),
+                        account.optString("name", account.optString("nombre", "Cuenta")),
+                        account.optDouble("balance", account.optDouble("saldo", 0)),
+                        account.optString("currency", account.optString("moneda", currency)),
+                        account.optString("type", account.optString("tipo", "")),
+                        account.optString("description", account.optString("descripcion", "")),
                         account.optBoolean("includeTotal", true),
                         account.optBoolean("hidden", false)
                 ));
@@ -3060,47 +2953,43 @@ public class MoneyMateActivity extends Activity {
             for (int i = 0; i < categoryArray.length(); i++) {
                 JSONObject category = categoryArray.getJSONObject(i);
                 categories.add(new ImportedCategory(
-                        category.optString("name", "Sin categoria"),
-                        normalizeKind(category.optString("kind", "expense")),
+                        category.optString("name", category.optString("nombre", "Sin categoria")),
+                        normalizeKind(category.optString("kind", category.optString("tipo", "expense"))),
                         category.optString("color", "")
                 ));
             }
         }
-        JSONArray transactionArray = root.optJSONArray("transactions");
-        if (transactionArray != null) {
-            for (int i = 0; i < transactionArray.length(); i++) {
-                JSONObject transaction = transactionArray.getJSONObject(i);
-                String kind = transaction.optString("kind", "expense");
-                String date = SpreadsheetExchange.normalizeDateForImport(transaction.optString("date", today()));
-                String time = transaction.optString("time", "00:00");
-                String account = transaction.optString("account", "Cuenta");
-                double amount = transaction.optDouble("amount", 0);
-                String note = transaction.optString("note", "");
-                String description = transaction.optString("description", "");
-                if ("transfer".equalsIgnoreCase(kind) || SpreadsheetExchange.isTransferKind(kind)) {
-                    String toAccount = transaction.optString("toAccount", "");
-                    if (toAccount.isEmpty() || account.equals(toAccount)) continue;
-                    txns.add(new ImportedTxn(date, time, account, "Transferencia", "expense", amount, note, description));
-                    txns.add(new ImportedTxn(date, time, toAccount, "Transferencia", "income", amount, note, description));
-                } else {
-                    txns.add(new ImportedTxn(
-                            date,
-                            time,
-                            account,
-                            transaction.optString("category", "Sin categoria"),
-                            normalizeKind(kind),
-                            amount,
-                            note,
-                            description
-                    ));
+        for (int i = 0; i < transactionArray.length(); i++) {
+            JSONObject transaction = transactionArray.getJSONObject(i);
+            String kind = transaction.optString("kind", transaction.optString("tipo", ""));
+            String date = SpreadsheetExchange.normalizeDateForImport(transaction.optString("date", transaction.optString("fecha", "")));
+            java.time.LocalDate.parse(date);
+            String time = transaction.optString("time", transaction.optString("hora", "00:00"));
+            String account = transaction.optString("account", transaction.optString("cuenta", "")).trim();
+            double amount = transaction.optDouble("amount", transaction.optDouble("importe", transaction.optDouble("monto", Double.NaN)));
+            if (kind.trim().isEmpty() || account.isEmpty() || !Double.isFinite(amount) || amount == 0) {
+                throw new IllegalArgumentException("Hay movimientos inválidos en el respaldo.");
+            }
+            String note = transaction.optString("note", transaction.optString("nota", ""));
+            String description = transaction.optString("description", transaction.optString("descripcion", ""));
+            String syncId = transaction.optString("id", "");
+            if (SpreadsheetExchange.isTransferKind(kind)) {
+                String toAccount = transaction.optString("toAccount", "").trim();
+                if (toAccount.isEmpty() || account.equalsIgnoreCase(toAccount)) {
+                    throw new IllegalArgumentException("Hay transferencias sin una cuenta de destino válida.");
                 }
+                txns.add(new ImportedTxn(date, time, account, "Transferencia", "expense", amount, note, description, syncId));
+                txns.add(new ImportedTxn(date, time, toAccount, "Transferencia", "income", amount, note, description, syncId));
+            } else {
+                txns.add(new ImportedTxn(date, time, account,
+                        transaction.optString("category", transaction.optString("categoria", "Sin categoria")),
+                        normalizeKind(kind), amount, note, description, syncId));
             }
         }
         completeImportLists(accounts, categories, txns);
-        db.replaceFromImport(accounts, categories, txns);
+        target.replaceFromImport(accounts, categories, txns, types);
         return new ImportResult(accounts.size(), categories.size(), txns.size());
     }
-
     private JSONObject categoryJson(MoneyDb.CategoryOption c) throws Exception {
         JSONObject item = new JSONObject();
         item.put("name", c.name);
@@ -3351,11 +3240,14 @@ public class MoneyMateActivity extends Activity {
     private Button modeButton(String label, String target) {
         Button b = smallButton(label, v -> {
             transactionMode = target;
-            renderScreen();
+            draw();
         });
         b.setTextColor(transactionMode.equals(target) ? actionColor : muted);
-        b.setTextSize(10);
-        b.setBackground(rounded(transactionMode.equals(target) ? actionSoft : surface2, 8, 0, strokeColor));
+        b.setTextSize(11);
+        b.setMinWidth(0);
+        b.setPadding(dp(2), 0, dp(2), 0);
+        b.setSelected(transactionMode.equals(target));
+        b.setBackground(rounded(transactionMode.equals(target) ? surface : surface2, 22, 0, surface2));
         return b;
     }
 
@@ -3451,7 +3343,7 @@ public class MoneyMateActivity extends Activity {
         tab.setOnClickListener(v -> screenTo(target));
         boolean selected = screen.equals(target);
         if (selected) {
-            tab.setBackground(new InsetDrawable(rounded(actionSoft, 8, 0, strokeColor), dp(5), dp(4), dp(5), dp(4)));
+            tab.setBackground(new InsetDrawable(rounded(actionSoft, 26, 0, strokeColor), dp(3), dp(2), dp(3), dp(2)));
         } else {
             tab.setBackgroundColor(Color.TRANSPARENT);
         }
@@ -3729,9 +3621,11 @@ public class MoneyMateActivity extends Activity {
         return s;
     }
 
-    private List<AccountSelectionOption> movementAccountChoices() {
+    private List<AccountSelectionOption> movementAccountChoices(MoneyDb.Row editing) {
         List<AccountSelectionOption> choices = new ArrayList<>();
         for (MoneyDb.AccountTotal account : db.accountTotals()) {
+            if (account.hidden && (editing == null || !(account.name.equals(editing.account)
+                    || account.name.equals(editing.transferFrom) || account.name.equals(editing.transferTo)))) continue;
             choices.add(new AccountSelectionOption(
                     account.name,
                     displayAccountType(account.type),

@@ -1,5 +1,3 @@
-const MS_DAY = 86_400_000;
-
 export function currency(value, code = "PEN") {
   return new Intl.NumberFormat("es-PE", {
     style: "currency",
@@ -9,9 +7,10 @@ export function currency(value, code = "PEN") {
 }
 
 export function rangeFor(scope, anchorValue, language = "es") {
-  const anchor = new Date(`${anchorValue}T12:00:00`);
+  const candidate = new Date(`${anchorValue}T12:00:00`);
+  const anchor = Number.isNaN(candidate.getTime()) ? new Date() : candidate;
   if (scope === "todo") {
-    const label = language === "en" ? "All" : language === "pt" ? "Tudo" : language === "fr" ? "Tout" : "Todo";
+    const label = language === "en" ? "All" : language === "pt" ? "Tudo" : language === "fr" ? "Tout" : "Total";
     return { start: null, end: null, label };
   }
   const start = new Date(anchor);
@@ -35,7 +34,7 @@ export function rangeFor(scope, anchorValue, language = "es") {
   if (scope === "semanal") {
     const day = start.getDay();
     start.setDate(start.getDate() - (day === 0 ? 6 : day - 1));
-    end.setTime(start.getTime() + 6 * MS_DAY);
+    end.setDate(start.getDate() + 6);
     return { start: iso(start), end: iso(end), label: `${shortDate(start, language)} - ${shortDate(end, language)}` };
   }
   if (scope === "diario") {
@@ -75,11 +74,27 @@ export function filterTransactions(transactions, filters) {
 export function summary(transactions) {
   let income = 0;
   let expense = 0;
+  let transfer = 0;
   for (const transaction of transactions) {
     if (transaction.kind === "income") income += Number(transaction.amount);
     if (transaction.kind === "expense") expense += Number(transaction.amount);
+    if (transaction.kind === "transfer") transfer += Number(transaction.amount);
   }
-  return { income, expense, balance: income - expense };
+  return { income, expense, transfer, balance: income - expense };
+}
+
+export function accountFlowsByType(transactions, accounts) {
+  const types = new Map(accounts.map(({ name, type }) => [name, type]));
+  const flows = new Map();
+  for (const kind of ["income", "expense"]) {
+    for (const { label, value } of accountFlowTotals(transactions, kind)) {
+      const row = flows.get(label) || { label, type: types.get(label) || "Cuentas de Banco", income: 0, expense: 0 };
+      row[kind] = value;
+      flows.set(label, row);
+    }
+  }
+  return [...flows.values()].sort((a, b) =>
+    Number(b.type === "Efectivo") - Number(a.type === "Efectivo") || a.type.localeCompare(b.type) || a.label.localeCompare(b.label));
 }
 
 export function statusSummary(transactions) {

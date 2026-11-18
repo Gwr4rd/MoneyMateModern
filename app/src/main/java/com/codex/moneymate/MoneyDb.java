@@ -20,7 +20,7 @@ import java.util.UUID;
 
 public final class MoneyDb extends SQLiteOpenHelper {
     static final String DB_NAME = "moneymate.sqlite";
-    private static final int VERSION = 8;
+    private static final int VERSION = 9;
     private final String databaseName;
 
     MoneyDb(Context context) {
@@ -37,7 +37,7 @@ public final class MoneyDb extends SQLiteOpenHelper {
         db.execSQL("CREATE TABLE accounts(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, balance REAL NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'USD', type TEXT NOT NULL DEFAULT 'Cuentas de Banco', description TEXT, include_total INTEGER NOT NULL DEFAULT 1, hidden INTEGER NOT NULL DEFAULT 0)");
         db.execSQL("CREATE TABLE account_types(name TEXT PRIMARY KEY COLLATE NOCASE)");
         db.execSQL("CREATE TABLE categories(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, kind TEXT NOT NULL, color TEXT NOT NULL DEFAULT '#0E8F70')");
-        db.execSQL("CREATE TABLE transactions(id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL, time TEXT NOT NULL DEFAULT '00:00', account TEXT NOT NULL, category TEXT NOT NULL, kind TEXT NOT NULL, amount REAL NOT NULL, note TEXT, description TEXT, transfer_ref TEXT)");
+        db.execSQL("CREATE TABLE transactions(id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL, time TEXT NOT NULL DEFAULT '00:00', account TEXT NOT NULL, category TEXT NOT NULL, kind TEXT NOT NULL, amount REAL NOT NULL, note TEXT, description TEXT, transfer_ref TEXT, sync_id TEXT)");
         db.execSQL("CREATE TABLE budgets(id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT NOT NULL, month TEXT NOT NULL, amount REAL NOT NULL)");
         seed(db);
     }
@@ -72,6 +72,10 @@ public final class MoneyDb extends SQLiteOpenHelper {
         }
         if (oldVersion < 8) {
             ensureAccountTypes(db);
+        }
+        if (oldVersion < 9) {
+            addColumn(db, "transactions", "sync_id TEXT");
+            db.execSQL("UPDATE transactions SET sync_id=lower(hex(randomblob(16))) WHERE sync_id IS NULL");
         }
     }
 
@@ -247,7 +251,7 @@ public final class MoneyDb extends SQLiteOpenHelper {
     private List<Row> rawTransactions(String startDate, String endDate, int limit) {
         SQLiteDatabase db = getReadableDatabase();
         List<Row> rows = new ArrayList<>();
-        String sql = "SELECT id,date,COALESCE(time,'00:00'),account,category,kind,amount,COALESCE(note,''),COALESCE(description,''),COALESCE(transfer_ref,'') FROM transactions";
+        String sql = "SELECT id,date,COALESCE(time,'00:00'),account,category,kind,amount,COALESCE(note,''),COALESCE(description,''),COALESCE(transfer_ref,''),COALESCE(sync_id,'') FROM transactions";
         List<String> args = new ArrayList<>();
         if (startDate != null && endDate != null) {
             sql += " WHERE date>=? AND date<=?";
@@ -258,7 +262,7 @@ public final class MoneyDb extends SQLiteOpenHelper {
         if (limit > 0) sql += " LIMIT " + limit;
         try (Cursor c = db.rawQuery(sql, args.toArray(new String[0]))) {
             while (c.moveToNext()) {
-                rows.add(new Row(c.getLong(0), c.getString(1), c.getString(2), c.getString(3), c.getString(4), c.getString(5), c.getDouble(6), c.getString(7), c.getString(8), c.getString(9)));
+                rows.add(new Row(c.getLong(0), c.getString(1), c.getString(2), c.getString(3), c.getString(4), c.getString(5), c.getDouble(6), c.getString(7), c.getString(8), c.getString(9), c.getString(10)));
             }
         }
         return rows;
@@ -305,9 +309,10 @@ public final class MoneyDb extends SQLiteOpenHelper {
     }
 
     private boolean sameTransfer(Row left, Row right) {
-        if (!left.transferRef.isEmpty() && !right.transferRef.isEmpty()) return left.transferRef.equals(right.transferRef);
+        if (!left.transferRef.isEmpty() || !right.transferRef.isEmpty()) return left.transferRef.equals(right.transferRef);
         return left.date.equals(right.date)
                 && left.time.equals(right.time)
+                && !left.account.equalsIgnoreCase(right.account)
                 && Math.abs(left.amount - right.amount) < 0.005
                 && left.note.equals(right.note)
                 && left.description.equals(right.description);
@@ -383,10 +388,7 @@ public final class MoneyDb extends SQLiteOpenHelper {
     }
 
     void addTransaction(String date, String time, String account, String category, String kind, double amount, String note, String description) {
-        getWritableDatabase().execSQL(
-                "INSERT INTO transactions(date,time,account,category,kind,amount,note,description) VALUES(?,?,?,?,?,?,?,?)",
-                new Object[]{date, time, account, category, kind, amount, note, description}
-        );
+        insertTransaction(getWritableDatabase(), date, time, account, category, kind, amount, note, description, null);
     }
 
     void addTransfer(String date, String time, String from, String to, double amount, String note, String description) {
@@ -417,7 +419,7 @@ public final class MoneyDb extends SQLiteOpenHelper {
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
-            if (!row.transferRef.isEmpty()) {
+            if (!row.transferRef.isEmpty() && row.linkedId > 0) {
                 db.execSQL("UPDATE transactions SET date=?,time=?,account=?,amount=?,note=?,description=? WHERE transfer_ref=? AND kind='expense'",
                         new Object[]{date, time, from, amount, note, description, row.transferRef});
                 db.execSQL("UPDATE transactions SET date=?,time=?,account=?,amount=?,note=?,description=? WHERE transfer_ref=? AND kind='income'",
@@ -447,6 +449,19 @@ public final class MoneyDb extends SQLiteOpenHelper {
         }
         db.delete("transactions", "id=?", new String[]{String.valueOf(row.id)});
         if (row.linkedId > 0) db.delete("transactions", "id=?", new String[]{String.valueOf(row.linkedId)});
+    }
+
+    void convertTransfer(Row row, String date, String time, String account, String category, String kind,
+                         double amount, String note, String description) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            deleteMovement(row);
+            insertTransaction(db, date, time, account, category, kind, amount, note, description, null, row.syncId);
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
     }
 
     void addAccount(String name, String currency) {
@@ -526,6 +541,10 @@ public final class MoneyDb extends SQLiteOpenHelper {
     }
 
     void replaceFromImport(List<ImportedAccount> accounts, List<ImportedCategory> categories, List<ImportedTxn> txns) {
+        replaceFromImport(accounts, categories, txns, java.util.Collections.emptyList());
+    }
+
+    void replaceFromImport(List<ImportedAccount> accounts, List<ImportedCategory> categories, List<ImportedTxn> txns, List<String> types) {
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
@@ -534,6 +553,9 @@ public final class MoneyDb extends SQLiteOpenHelper {
             db.delete("categories", null, null);
             db.delete("transactions", null, null);
             seedAccountTypes(db);
+            for (String type : types) {
+                db.execSQL("INSERT OR IGNORE INTO account_types(name) VALUES(?)", new Object[]{type});
+            }
             if (accounts.isEmpty()) seedAccountsOnly(db);
             for (ImportedAccount a : accounts) {
                 String normalizedType = accountType(a.type, a.name);
@@ -549,12 +571,12 @@ public final class MoneyDb extends SQLiteOpenHelper {
                 String transferRef = null;
                 if (isTransferExpense(t) && i + 1 < txns.size() && isMatchingTransferIncome(t, txns.get(i + 1))) {
                     transferRef = UUID.randomUUID().toString();
-                    insertTransaction(db, t.date, t.time, t.account, t.category, t.kind, t.amount, t.note, t.description, transferRef);
+                    insertTransaction(db, t.date, t.time, t.account, t.category, t.kind, t.amount, t.note, t.description, transferRef, t.syncId);
                     ImportedTxn income = txns.get(++i);
-                    insertTransaction(db, income.date, income.time, income.account, income.category, income.kind, income.amount, income.note, income.description, transferRef);
+                    insertTransaction(db, income.date, income.time, income.account, income.category, income.kind, income.amount, income.note, income.description, transferRef, income.syncId);
                     continue;
                 }
-                insertTransaction(db, t.date, t.time, t.account, t.category, t.kind, t.amount, t.note, t.description, transferRef);
+                insertTransaction(db, t.date, t.time, t.account, t.category, t.kind, t.amount, t.note, t.description, transferRef, t.syncId);
             }
             dedupeAccounts(db);
             backfillTransferRefs(db);
@@ -577,12 +599,12 @@ public final class MoneyDb extends SQLiteOpenHelper {
         try (Cursor c = db.rawQuery("SELECT name,kind,color FROM categories ORDER BY id", null)) {
             while (c.moveToNext()) categories.add(new ImportedCategory(c.getString(0), c.getString(1), c.getString(2)));
         }
-        try (Cursor c = db.rawQuery("SELECT date,COALESCE(time,'00:00'),account,category,kind,amount,COALESCE(note,''),COALESCE(description,'') FROM transactions ORDER BY id", null)) {
+        try (Cursor c = db.rawQuery("SELECT date,COALESCE(time,'00:00'),account,category,kind,amount,COALESCE(note,''),COALESCE(description,''),COALESCE(sync_id,'') FROM transactions ORDER BY id", null)) {
             while (c.moveToNext()) {
-                transactions.add(new ImportedTxn(c.getString(0), c.getString(1), c.getString(2), c.getString(3), c.getString(4), c.getDouble(5), c.getString(6), c.getString(7)));
+                transactions.add(new ImportedTxn(c.getString(0), c.getString(1), c.getString(2), c.getString(3), c.getString(4), c.getDouble(5), c.getString(6), c.getString(7), c.getString(8)));
             }
         }
-        return new ImportBundle(accounts, categories, transactions);
+        return new ImportBundle(accounts, categories, transactions, accountTypes());
     }
 
     int removeExactDuplicateTransactions() {
@@ -661,7 +683,6 @@ public final class MoneyDb extends SQLiteOpenHelper {
         } finally {
             db.endTransaction();
         }
-        removeExactDuplicateTransactions();
     }
 
     String earliestDate() {
@@ -707,9 +728,13 @@ public final class MoneyDb extends SQLiteOpenHelper {
     }
 
     private void insertTransaction(SQLiteDatabase db, String date, String time, String account, String category, String kind, double amount, String note, String description, String transferRef) {
+        insertTransaction(db, date, time, account, category, kind, amount, note, description, transferRef, "");
+    }
+
+    private void insertTransaction(SQLiteDatabase db, String date, String time, String account, String category, String kind, double amount, String note, String description, String transferRef, String syncId) {
         db.execSQL(
-                "INSERT INTO transactions(date,time,account,category,kind,amount,note,description,transfer_ref) VALUES(?,?,?,?,?,?,?,?,?)",
-                new Object[]{date, time, account, category, kind, amount, note, description, transferRef}
+                "INSERT INTO transactions(date,time,account,category,kind,amount,note,description,transfer_ref,sync_id) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                new Object[]{date, time, account, category, kind, amount, note, description, transferRef, syncId.isEmpty() ? UUID.randomUUID().toString() : syncId}
         );
     }
 
@@ -886,15 +911,18 @@ public final class MoneyDb extends SQLiteOpenHelper {
     static final class Row {
         final long id;
         final long linkedId;
-        final String date, time, account, category, kind, note, description, transferRef, transferFrom, transferTo;
+        final String date, time, account, category, kind, note, description, transferRef, transferFrom, transferTo, syncId;
         final double amount;
         Row(long id, String date, String time, String account, String category, String kind, double amount, String note, String description) {
             this(id, date, time, account, category, kind, amount, note, description, "");
         }
         Row(long id, String date, String time, String account, String category, String kind, double amount, String note, String description, String transferRef) {
-            this(id, -1, date, time, account, category, kind, amount, note, description, transferRef, "", "");
+            this(id, date, time, account, category, kind, amount, note, description, transferRef, "");
         }
-        private Row(long id, long linkedId, String date, String time, String account, String category, String kind, double amount, String note, String description, String transferRef, String transferFrom, String transferTo) {
+        Row(long id, String date, String time, String account, String category, String kind, double amount, String note, String description, String transferRef, String syncId) {
+            this(id, -1, date, time, account, category, kind, amount, note, description, transferRef, "", "", syncId);
+        }
+        private Row(long id, long linkedId, String date, String time, String account, String category, String kind, double amount, String note, String description, String transferRef, String transferFrom, String transferTo, String syncId) {
             this.id = id;
             this.linkedId = linkedId;
             this.date = date;
@@ -908,15 +936,16 @@ public final class MoneyDb extends SQLiteOpenHelper {
             this.transferRef = transferRef == null ? "" : transferRef;
             this.transferFrom = transferFrom == null ? "" : transferFrom;
             this.transferTo = transferTo == null ? "" : transferTo;
+            this.syncId = syncId;
         }
         static Row transfer(Row expense, Row income) {
             String ref = !expense.transferRef.isEmpty() ? expense.transferRef : income.transferRef;
-            return new Row(expense.id, income.id, expense.date, expense.time, expense.account, "Transferencia", "transfer", expense.amount, expense.note, expense.description, ref, expense.account, income.account);
+            return new Row(expense.id, income.id, expense.date, expense.time, expense.account, "Transferencia", "transfer", expense.amount, expense.note, expense.description, ref, expense.account, income.account, expense.syncId);
         }
         Row asUnpairedTransfer() {
             String from = "expense".equals(kind) ? account : "";
             String to = "income".equals(kind) ? account : "";
-            return new Row(id, -1, date, time, account, "Transferencia", "transfer", amount, note, description, transferRef, from, to);
+            return new Row(id, -1, date, time, account, "Transferencia", "transfer", amount, note, description, transferRef, from, to, syncId);
         }
         boolean isTransferPart() {
             return "Transferencia".equals(category);
@@ -985,11 +1014,13 @@ public final class MoneyDb extends SQLiteOpenHelper {
         final List<ImportedAccount> accounts;
         final List<ImportedCategory> categories;
         final List<ImportedTxn> transactions;
+        final List<String> accountTypes;
 
-        ImportBundle(List<ImportedAccount> accounts, List<ImportedCategory> categories, List<ImportedTxn> transactions) {
+        ImportBundle(List<ImportedAccount> accounts, List<ImportedCategory> categories, List<ImportedTxn> transactions, List<String> accountTypes) {
             this.accounts = accounts;
             this.categories = categories;
             this.transactions = transactions;
+            this.accountTypes = accountTypes;
         }
     }
 

@@ -13,7 +13,7 @@ import {
   ReportDialog,
   SyncDialog,
 } from "./components/Dialogs";
-import { Filters } from "./components/Filters";
+import { Filters, TransactionPeriods } from "./components/Filters";
 import { StatusPanel } from "./components/StatusPanel";
 import { Summary } from "./components/Summary";
 import { TransactionList } from "./components/TransactionList";
@@ -29,7 +29,7 @@ import {
   summary,
   today,
 } from "./lib/finance";
-import { IMPORT_UNDO_KEY, normalizeSnapshot } from "./lib/backup";
+import { IMPORT_UNDO_KEY, normalizeSnapshot, validateSnapshot } from "./lib/backup";
 import {
   createAccount,
   downloadSnapshot,
@@ -39,6 +39,7 @@ import {
   SYNC_CONFLICT_KEY,
   SYNC_PENDING_KEY,
   SYNC_REMOTE_KEY,
+  SnapshotConflict,
   uploadSnapshot,
 } from "./lib/supabase";
 
@@ -48,8 +49,9 @@ export default function App() {
   const [dark, setDark] = useState(() => localStorage.getItem("moneymate-theme") === "dark");
   const [language, setLanguage] = useState(() => localStorage.getItem("moneymate-language") || "es");
   const [filters, setFilters] = useState({ query: "", account: "", anchor: latestDate(data.transactions) });
-  const [scope, setScope] = useState("mensual");
-  const [statusKind, setStatusKind] = useState("expense");
+  const [scope, setScope] = useState("diario");
+  const [statusScope, setStatusScope] = useState("mensual");
+  const [statusAnchor, setStatusAnchor] = useState(() => latestDate(data.transactions));
   const [showHiddenAccounts, setShowHiddenAccounts] = useState(false);
   const [dialog, setDialog] = useState(null);
   const [syncBusy, setSyncBusy] = useState(false);
@@ -60,6 +62,7 @@ export default function App() {
   const searchRef = useRef(null);
   const syncTimerRef = useRef(null);
   const syncOperationRef = useRef(false);
+  const localRevisionRef = useRef(0);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -92,7 +95,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!syncUser || syncRevision === 0) return undefined;
+    if (!syncUser || syncRevision === 0 || syncConflict) return undefined;
+    const localRevision = localRevisionRef.current;
     window.clearTimeout(syncTimerRef.current);
     syncTimerRef.current = window.setTimeout(async () => {
       if (syncOperationRef.current) {
@@ -101,19 +105,19 @@ export default function App() {
       }
       syncOperationRef.current = true;
       try {
-        if (await hasRemoteSyncConflict()) {
+        const result = await uploadSnapshot(data, localStorage.getItem(SYNC_REMOTE_KEY) || "");
+        if (result?.updated_at) localStorage.setItem(SYNC_REMOTE_KEY, result.updated_at);
+        if (localRevision === localRevisionRef.current) {
+          localStorage.removeItem(SYNC_PENDING_KEY);
+          setSyncMessage("Cambios guardados automáticamente.");
+        }
+      } catch (error) {
+        if (error instanceof SnapshotConflict) {
           localStorage.setItem(SYNC_CONFLICT_KEY, "1");
           setSyncConflict(true);
           setSyncMessage("Hay cambios locales y en la nube. Abre Sincronización y elige qué copia conservar.");
           return;
         }
-        const result = await uploadSnapshot(data);
-        if (result?.updated_at) localStorage.setItem(SYNC_REMOTE_KEY, result.updated_at);
-        localStorage.removeItem(SYNC_PENDING_KEY);
-        localStorage.removeItem(SYNC_CONFLICT_KEY);
-        setSyncConflict(false);
-        setSyncMessage("Cambios guardados automáticamente.");
-      } catch (error) {
         localStorage.setItem(SYNC_PENDING_KEY, "1");
         setSyncMessage(`Sincronización pendiente: ${error.message}`);
         syncTimerRef.current = window.setTimeout(
@@ -125,20 +129,25 @@ export default function App() {
       }
     }, 900);
     return () => window.clearTimeout(syncTimerRef.current);
-  }, [syncRevision, syncUser]);
+  }, [syncRevision, syncUser, syncConflict]);
 
   useEffect(() => {
     if (!syncUser) return undefined;
     let active = true;
     async function pollCloud() {
-      if (!active || syncOperationRef.current || localStorage.getItem(SYNC_PENDING_KEY) === "1") return;
+      if (!active || syncOperationRef.current || localStorage.getItem(SYNC_PENDING_KEY) === "1"
+          || localStorage.getItem(SYNC_CONFLICT_KEY) === "1") return;
       syncOperationRef.current = true;
       try {
         const remote = await downloadSnapshot();
+        if (!active || localStorage.getItem(SYNC_PENDING_KEY) === "1") return;
         const previous = localStorage.getItem(SYNC_REMOTE_KEY) || "";
         if (!previous) {
-          localStorage.setItem(SYNC_REMOTE_KEY, remote.updated_at || "");
+          localStorage.setItem(SYNC_CONFLICT_KEY, "1");
+          setSyncConflict(true);
+          setSyncMessage("Ya existe una copia en Supabase. Elige qué copia conservar.");
         } else if (remote.updated_at && remote.updated_at !== previous) {
+          validateSnapshot(remote.data);
           setData(normalizeSnapshot(remote.data).data);
           localStorage.setItem(SYNC_REMOTE_KEY, remote.updated_at);
           setSyncMessage("Cambios recientes recibidos desde Supabase.");
@@ -160,12 +169,12 @@ export default function App() {
     };
   }, [syncUser]);
 
-  const range = useMemo(() => rangeFor(scope, filters.anchor, language), [scope, filters.anchor, language]);
+  const range = useMemo(() => rangeFor(scope === "diario" ? "todo" : scope, filters.anchor, language), [scope, filters.anchor, language]);
   const visibleTransactions = useMemo(
     () => filterTransactions(data.transactions, { ...filters, range }),
     [data.transactions, filters, range],
   );
-  const summaryValue = useMemo(() => summary(visibleTransactions), [visibleTransactions]);
+  const summaryValue = useMemo(() => summary(scope === "todo" ? data.transactions : visibleTransactions), [scope, data.transactions, visibleTransactions]);
   const accounts = useMemo(() => accountBalances(data), [data]);
 
   function navigate(next) {
@@ -175,25 +184,16 @@ export default function App() {
 
   function openSearch() {
     setActive("transactions");
+    if (scope === "todo") setScope("diario");
     requestAnimationFrame(() => searchRef.current?.querySelector("input")?.focus());
   }
 
   function commitData(update, closeDialog = true) {
+    localRevisionRef.current += 1;
     localStorage.setItem(SYNC_PENDING_KEY, "1");
     setData(update);
     setSyncRevision((value) => value + 1);
     if (closeDialog) setDialog(null);
-  }
-
-  async function hasRemoteSyncConflict() {
-    try {
-      const remote = await downloadSnapshot();
-      const previous = localStorage.getItem(SYNC_REMOTE_KEY) || "";
-      return Boolean(remote.updated_at && (!previous || remote.updated_at !== previous));
-    } catch (error) {
-      if (String(error.message).includes("Todavia no existe")) return false;
-      throw error;
-    }
   }
 
   function saveMovement(transaction) {
@@ -217,7 +217,8 @@ export default function App() {
 
   function saveAccount(account) {
     const originalName = account.originalName;
-    const duplicate = data.accounts.some((item) => item.name === account.name && item.name !== originalName);
+    const canonical = (name) => name.trim().replace(/\s+/g, " ").toLocaleLowerCase("es");
+    const duplicate = data.accounts.some((item) => item.name !== originalName && canonical(item.name) === canonical(account.name));
     if (duplicate) {
       window.alert(t("Ya existe una cuenta con ese nombre.", language));
       return;
@@ -274,6 +275,11 @@ export default function App() {
   }
 
   function deleteAccount(account) {
+    if (data.transactions.some((item) => item.account === account.name || item.toAccount === account.name)) {
+      if (!account.hidden && window.confirm(t("Esta cuenta tiene movimientos. ¿Ocultarla y conservar su historial?", language))) toggleAccountHidden(account);
+      else if (account.hidden) window.alert(t("No se puede eliminar una cuenta que tiene movimientos.", language));
+      return;
+    }
     if (!window.confirm(`${t("Eliminar cuenta", language)} "${account.name}"? ${t("Los movimientos historicos conservaran su nombre.", language)}`)) return;
     commitData((current) => ({
       ...current,
@@ -309,17 +315,26 @@ export default function App() {
   }
 
   async function syncUpload() {
+    if (syncOperationRef.current) return;
+    if (syncConflict && !window.confirm(t("¿Reemplazar la copia de la nube con los cambios locales?", language))) return;
+    const revision = localRevisionRef.current;
     setSyncBusy(true);
     setSyncMessage("");
     syncOperationRef.current = true;
     try {
-      const result = await uploadSnapshot(data);
+      const result = await uploadSnapshot(data, syncConflict ? undefined : localStorage.getItem(SYNC_REMOTE_KEY) || "");
       if (result?.updated_at) localStorage.setItem(SYNC_REMOTE_KEY, result.updated_at);
-      localStorage.removeItem(SYNC_PENDING_KEY);
+      if (revision === localRevisionRef.current) localStorage.removeItem(SYNC_PENDING_KEY);
       localStorage.removeItem(SYNC_CONFLICT_KEY);
       setSyncConflict(false);
       setSyncMessage("Copia subida correctamente.");
     } catch (error) {
+      if (error instanceof SnapshotConflict) {
+        localStorage.setItem(SYNC_CONFLICT_KEY, "1");
+        setSyncConflict(true);
+        setSyncMessage("Hay cambios en la nube. Elige qué copia conservar.");
+        return;
+      }
       localStorage.setItem(SYNC_PENDING_KEY, "1");
       setSyncMessage(error.message);
     } finally {
@@ -329,12 +344,16 @@ export default function App() {
   }
 
   async function syncDownload() {
+    if (syncOperationRef.current) return;
     if (!window.confirm(t("La copia de Supabase reemplazara los datos guardados en este navegador.", language))) return;
+    const revision = localRevisionRef.current;
     setSyncBusy(true);
     setSyncMessage("");
     syncOperationRef.current = true;
     try {
       const remote = await downloadSnapshot();
+      if (revision !== localRevisionRef.current) throw new Error("Hay cambios posteriores a la confirmación. Vuelve a descargar la copia.");
+      validateSnapshot(remote.data);
       setData(normalizeSnapshot(remote.data).data);
       if (remote.updated_at) localStorage.setItem(SYNC_REMOTE_KEY, remote.updated_at);
       localStorage.removeItem(SYNC_PENDING_KEY);
@@ -467,39 +486,47 @@ export default function App() {
       <div className="app-body">
         <SideNav active={active} onChange={navigate} language={language} />
         <main className="main-content">
+          {syncUser && (syncConflict || localStorage.getItem(SYNC_PENDING_KEY) === "1") ? (
+            <button type="button" className="sync-indicator" onClick={() => setDialog("sync")}>
+              {t(syncConflict ? "Conflicto de sincronización" : "Sincronización pendiente", language)}
+            </button>
+          ) : null}
           {active === "transactions" ? (
             <>
-              <Summary value={summaryValue} currencyCode={data.currency} language={language} />
+              <h1 className="page-heading">{t("Transacciones", language)}</h1>
+              <TransactionPeriods value={scope} onChange={setScope} language={language} />
               <button className="mobile-new" onClick={() => setDialog("movement")}><Plus size={20} /> {t("Nuevo movimiento", language)}</button>
-              <div ref={searchRef}>
+              {scope !== "todo" ? <div ref={searchRef}>
                 <Filters
                   filters={filters}
                   accounts={data.accounts}
                   scope={scope}
-                  onScope={setScope}
                   onChange={setFilters}
-                  onClear={() => { setFilters({ query: "", account: "", anchor: today() }); setScope("mensual"); }}
+                  onClear={() => setFilters({ query: "", account: "", anchor: today() })}
                   language={language}
                 />
-              </div>
-              <TransactionList
+              </div> : null}
+              {scope !== "diario" ? <div className="period-summary">
+                <h2>{range.label}</h2>
+                <Summary value={summaryValue} currencyCode={data.currency} language={language} />
+              </div> : null}
+              {scope !== "todo" ? <TransactionList
                 transactions={visibleTransactions}
                 currencyCode={data.currency}
                 onEdit={(transaction) => setDialog({ type: "movement", mode: "edit", item: transaction })}
                 onCopy={(transaction) => setDialog({ type: "movement", mode: "copy", item: transaction })}
                 onDelete={deleteMovement}
                 language={language}
-              />
+              /> : null}
             </>
           ) : null}
           {active === "status" ? (
             <StatusPanel
               data={data}
-              scope={scope}
-              anchor={filters.anchor}
-              kind={statusKind}
-              onScope={setScope}
-              onKind={setStatusKind}
+              scope={statusScope}
+              anchor={statusAnchor}
+              onScope={setStatusScope}
+              onAnchor={setStatusAnchor}
               onExport={exportStatus}
               language={language}
             />
@@ -518,30 +545,13 @@ export default function App() {
               onDelete={deleteAccount}
               onSelect={(account) => {
                 setFilters((current) => ({ ...current, account: account.name, query: "" }));
-                setScope("todo");
+                setScope("diario");
                 navigate("transactions");
               }}
               language={language}
             />
           ) : null}
         </main>
-        <aside className="context-rail">
-          <StatusPanel
-            data={data}
-            scope={scope}
-            anchor={filters.anchor}
-            kind={statusKind}
-            onScope={setScope}
-            onKind={setStatusKind}
-            compact
-            language={language}
-          />
-          <AccountsPanel accounts={accounts} currencyCode={data.currency} onSelect={(account) => {
-            setFilters((current) => ({ ...current, account: account.name, query: "" }));
-            setScope("todo");
-            navigate("transactions");
-          }} language={language} />
-        </aside>
       </div>
       <MobileNav active={active} onChange={navigate} language={language} />
       {(dialog === "movement" || dialog?.type === "movement") ? (

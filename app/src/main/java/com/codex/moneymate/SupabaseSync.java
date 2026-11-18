@@ -1,5 +1,7 @@
 package com.codex.moneymate;
 
+import android.net.Uri;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -59,25 +61,33 @@ final class SupabaseSync {
         ), false);
     }
 
-    static String upload(String projectUrl, String publishableKey, Session session, JSONObject snapshot) throws Exception {
+    static String upload(String projectUrl, String publishableKey, Session session, JSONObject snapshot, String expectedVersion) throws Exception {
         JSONArray rows = new JSONArray();
         JSONObject row = new JSONObject();
         row.put("user_id", session.userId);
         row.put("data", snapshot);
         rows.put(row);
+        boolean conditionalUpdate = expectedVersion != null && !expectedVersion.isEmpty();
+        String table = normalizeUrl(projectUrl) + "/rest/v1/money_snapshots";
+        String endpoint = conditionalUpdate
+                ? table + "?select=updated_at&user_id=eq." + Uri.encode(session.userId) + "&updated_at=eq." + Uri.encode(expectedVersion)
+                : table + "?on_conflict=user_id&select=updated_at";
+        String prefer = conditionalUpdate ? "return=representation"
+                : (expectedVersion == null ? "resolution=merge-duplicates" : "resolution=ignore-duplicates") + ",return=representation";
         JSONObject response = request(
-                normalizeUrl(projectUrl) + "/rest/v1/money_snapshots?on_conflict=user_id&select=updated_at",
-                "POST",
+                endpoint,
+                conditionalUpdate ? "PATCH" : "POST",
                 publishableKey,
                 session.accessToken,
-                rows.toString(),
-                "resolution=merge-duplicates,return=representation"
+                conditionalUpdate ? new JSONObject().put("data", snapshot).toString() : rows.toString(),
+                prefer
         );
         JSONArray resultRows = response.optJSONArray("rows");
-        return resultRows == null || resultRows.length() == 0
-                ? ""
-                : resultRows.getJSONObject(0).optString("updated_at");
+        if (resultRows == null || resultRows.length() == 0) throw new SnapshotConflict();
+        return resultRows.getJSONObject(0).getString("updated_at");
     }
+
+    static final class SnapshotConflict extends Exception {}
 
     static RemoteSnapshot download(String projectUrl, String publishableKey, Session session) throws Exception {
         JSONObject response = request(

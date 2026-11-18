@@ -2256,6 +2256,79 @@ select:focus-visible {
   .mobile-overflow[open] > div { width: min(245px, 88vw); }
 }
 
+.app-body { grid-template-columns: 208px minmax(0, 1fr); }
+.main-content { width: 100%; max-width: 1050px; margin-inline: auto; }
+.side-nav button, .desktop-top-nav button, .mobile-nav, .mobile-nav button { border-radius: 999px; }
+.side-nav button { border-left: 0; }
+.app-header { background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(18px); }
+.page-heading { margin: 0 0 16px; font-size: 28px; line-height: 1.16; }
+.sync-indicator { margin-bottom: 8px; padding: 3px 0; border: 0; background: transparent; color: var(--muted); font-size: 12px; text-decoration: underline; cursor: pointer; }
+.transaction-periods {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  gap: 2px;
+  margin-bottom: 14px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.transaction-periods button {
+  flex: 1 0 auto;
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.transaction-periods button[aria-pressed="true"] { background: var(--surface); color: var(--text); }
+.filters { grid-template-columns: minmax(0, 1fr) 44px; }
+.filters .search-field { grid-column: 1; }
+.filter-more { grid-column: 2; }
+.period-summary { margin: 14px 0 18px; }
+.period-summary h2, .status-period h2, .flow-group h2 { margin: 0 0 12px; font-size: 16px; }
+.period-summary .summary-band { gap: 10px; padding: 0 0 16px; }
+.period-summary .summary-item strong { font-size: 18px; white-space: normal; overflow-wrap: anywhere; }
+.summary-item.transfer strong { color: var(--blue); }
+.status-toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.status-toolbar .period-select { width: auto; min-width: 108px; }
+.status-toolbar input { min-height: 40px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
+.status-period { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 22px 0 8px; }
+.status-period h2 { margin: 0; }
+.status-period span { color: var(--muted); font-size: 13px; }
+.status-period strong { color: var(--text); }
+.paired-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.flow-chart { min-width: 0; margin: 0; padding: 14px 10px; text-align: center; border-radius: 8px; background: var(--surface); }
+.flow-chart figcaption { font-size: 14px; font-weight: 700; }
+.flow-chart.income > strong { color: var(--green); }
+.flow-chart.expense > strong { color: var(--red); }
+.flow-chart > strong { overflow-wrap: anywhere; }
+.flow-ring { display: grid; place-items: center; margin: 12px auto; width: min(100%, 138px); aspect-ratio: 1; border-radius: 50%; }
+.flow-ring > div { width: 76%; aspect-ratio: 1; border-radius: 50%; background: var(--surface); }
+.flow-legend { display: grid; gap: 6px; margin: 12px auto 0; padding: 0; list-style: none; text-align: left; max-width: 260px; }
+.flow-legend li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: 6px; align-items: baseline; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.flow-legend i { width: 8px; height: 8px; border-radius: 50%; }
+.flow-group { margin-top: 24px; }
+.account-flow { padding: 10px 0 12px; border-bottom: 1px solid var(--border); }
+.account-flow h3 { font-size: 14px; margin: 0 0 8px; }
+.account-flow-line { display: grid; grid-template-columns: minmax(53px, 0.5fr) minmax(20px, 2fr) minmax(72px, 0.8fr); gap: 8px; align-items: center; margin: 6px 0; font-size: 12px; }
+.account-flow-line strong { text-align: right; overflow-wrap: anywhere; }
+.flow-track { height: 6px; border-radius: 999px; background: var(--surface-2); }
+.flow-track i { display: block; height: 100%; border-radius: inherit; background: var(--green); }
+.account-flow-line.expense .flow-track i { background: var(--red); }
+@media (max-width: 760px) {
+  .app-body { grid-template-columns: minmax(0, 1fr); }
+  .page-heading { font-size: 24px; }
+  .transaction-periods button { padding-inline: 8px; font-size: 12px; }
+  .transaction-periods { width: 100%; }
+  .period-summary .summary-item strong { font-size: 14px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
